@@ -12,3 +12,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 add_executable(three_body
     src/main.cpp
 )
+
+target_include_directories(three_body PRIVATE
+    "${CMAKE_SOURCE_DIR}/include"
+)
