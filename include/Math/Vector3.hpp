@@ -78,7 +78,7 @@ struct Vector3 {
     // Length Operations
     // Length Squared: a**2
     double lengthSquared() const {
-        return x * x, y * y, z * z;
+        return x * x + y * y + z * z;
     }
 
     // Length: a
