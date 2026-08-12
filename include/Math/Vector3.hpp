@@ -83,7 +83,7 @@ struct Vector3 {
 
     // Length: a
     double length() const {
-        return std::sqrt(lengthSquared());
+        return std::hypot(x, y, z);
     }
 
     // Comparision Operators
@@ -110,6 +110,6 @@ inline const Vector3 Vector3::UnitZ = Vector3(0.0, 0.0, 1.0);
 
 // Free functions
 // Scalar multiplication
-Vector3 operator*(double scalar, const Vector3& v) {
+inline Vector3 operator*(double scalar, const Vector3& v) {
     return v * scalar;
 }
