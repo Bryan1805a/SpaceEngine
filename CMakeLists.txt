@@ -45,6 +45,7 @@ add_executable(three_body
     src/glad.c
     include/Simulation/Simulation.hpp
     src/Simulation/Simulation.cpp
+    src/Graphics/Renderer.cpp
 )
 
 target_include_directories(three_body PRIVATE
