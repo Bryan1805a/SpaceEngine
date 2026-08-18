@@ -1,6 +1,8 @@
 #pragma once
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include <vector>
+#include <Physics/Body.hpp>
 
 namespace Graphics {
     class Renderer {
@@ -8,6 +10,14 @@ namespace Graphics {
             GLFWwindow* window;
             int width;
             int height;
+
+            // GPU resource management variables
+            unsigned int shaderProgram;
+            unsigned int VAO, VBO;
+
+            // Local init vars
+            void initShaders();
+            void initCube();
         
         public:
             Renderer(int w, int h, const char* title);
@@ -19,5 +29,7 @@ namespace Graphics {
             void clear() const;
             void swapBuffers() const;
             void pollEvents() const;
+
+            void draw(const std::vector<Physics::Body>& bodies) const;
     };
 }
