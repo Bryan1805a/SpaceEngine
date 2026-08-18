@@ -3,6 +3,7 @@
 #include <Math/Vector3.hpp>
 #include <Physics/Body.hpp>
 #include <Simulation/Simulation.hpp>
+#include <Graphics/Renderer.hpp>
 
 int main() {
     // Init gravity constant G = 1.0 and delta time = 0.01 second
@@ -19,32 +20,21 @@ int main() {
     // Body 2: A planet along with -x axis
     sim.addBody(Physics::Body(1.0, Vector3(-150, 0.0, 0.0), Vector3(0.0, -2.58, 0.0)));
 
-    std::cout << "START SIMULATION" << std::endl << std::endl;
+    // Init graphics window (1280x720)
+    Graphics::Renderer renderer(1280, 720, "Three-Body Simulation");
 
-    // Config console to ouput 2 ditgits number
-    std::cout << std::fixed << std::setprecision(2);
+    std::cout << "Running simulation" << std::endl;
 
-    // Main loop
-    int total_steps = 1000;
-    int print_interval = 200;
-
-    for (int step = 0; step <= total_steps; ++step) {
-        // Print status
-        if (step % print_interval == 0) {
-            std::cout << "[ Step " << step << " | Time t = " << step * 0.01 << " ]\n";
-
-            const auto& bodies = sim.getBodies();
-            for (size_t i = 0; i < bodies.size(); ++i) {
-                std::cout << " Body " << i
-                          << " | Position: " << bodies[i].position
-                          << " | Velocity: " << bodies[i].velocity
-                          << "\n";
-            }
-            std::cout << "---------------------------------\n";
-        }
-
+    while (!renderer.shouldClose()) {
+        renderer.pollEvents();
         sim.step();
+        renderer.clear();
+
+        // Todo
+
+        renderer.swapBuffers();
     }
 
+    std::cout << "Simulation ended" << std::endl;
     return 0;
 }
