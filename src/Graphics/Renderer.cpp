@@ -1,5 +1,8 @@
 #include <Graphics/Renderer.hpp>
 #include <iostream>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 namespace Graphics {
     Renderer::Renderer(int w, int h, const char* title) : width(w), height(h), window(nullptr) {
@@ -143,5 +146,67 @@ namespace Graphics {
 
     void Renderer::pollEvents() const {
         glfwPollEvents();
+    }
+
+    void Renderer::draw(const std::vector<Physics::Body>& bodies) const {
+        // Activate Shader Program
+        glUseProgram(shaderProgram);
+
+        // Setup CAMERA and SPACE
+
+        // Projection Matrix
+        // Creates a perspective effect (45 FOV, view range from 0.1 to 1000.0)
+        glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)width / (float)height, 0.1f, 1000.0f);
+        int projLoc = glGetUniformLocation(shaderProgram, "projection");
+        glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
+
+        // View Matrix
+        // Position the camera high up (Y=150) and set it back (Z=300)
+        // Point the camera direcly down at the origin (0, 0, 0)
+        glm::mat4 view = glm::lookAt(glm::vec3(0.0f, 150.0f, 300.0f),
+                                     glm::vec3(0.0f, 0.0f, 0.0f),
+                                     glm::vec3(0.0f, 1.0f, 0.0f));
+        int viewLoc = glGetUniformLocation(shaderProgram, "view");
+        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
+
+        // Drawing objects
+        // Bind the VAO again to let the GPU know we are about to use the cube's vertex data
+        glBindVertexArray(VAO);
+
+        int modeLoc = glGetUniformLocation(shaderProgram, "model");
+        int colorLoc = glGetUniformLocation(shaderProgram, "objectColor");
+
+        for (size_t i = 0; i < bodies.size(); ++i) {
+            // Model matrix
+            // Start with identity matrix standing at Origin
+            glm::mat4 model = glm::mat4(1.0f);
+
+            // Move the cube based on the position calculated from physics
+            glm::vec3 pos((float)bodies[i].position.x, (float)bodies[i].position.y, (float)bodies[i].position.z);
+            model = glm::translate(model, pos);
+
+            // Categorise volumes to scaling and colour-coding to improve visibility
+            if (i == 0) { // A large star
+                model = glm::scale(model, glm::vec3(10.0f, 10.0f, 10.0f));
+                glUniform3f(colorLoc, 1.0f, 0.8f, 0.2f); // Yellow
+            }
+            else if (i == 1) {
+                model = glm::scale(model, glm::vec3(3.0f, 3.0f, 3.0f));
+                glUniform3f(colorLoc, 0.2f, 0.6f, 1.0f); // Blue
+            }
+            else {
+                model = glm::scale(model, glm::vec3(2.0f, 2.0f, 2.0f));
+                glUniform3f(colorLoc, 1.0f, 0.3f, 0.2f); // Red
+            }
+
+            // Send this object's own model matrix to the GPU
+            glUniformMatrix4fv(modeLoc, 1, GL_FALSE, glm::value_ptr(model));
+
+            // Draw command: Drawing 36 vertices from VBO (Forming a cube)
+            glDrawArrays(GL_TRIANGLES, 0, 36);
+        }
+
+        // Unbind VAO after drawing is complete
+        glBindVertexArray(0);
     }
 }
