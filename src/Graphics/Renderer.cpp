@@ -148,7 +148,7 @@ namespace Graphics {
         glfwPollEvents();
     }
 
-    void Renderer::draw(const std::vector<Physics::Body>& bodies) const {
+    void Renderer::draw(size_t count, const std::vector<Vector3>& positions, const std::vector<double>& masses) const {
         // Activate Shader Program
         glUseProgram(shaderProgram);
 
@@ -176,13 +176,13 @@ namespace Graphics {
         int modeLoc = glGetUniformLocation(shaderProgram, "model");
         int colorLoc = glGetUniformLocation(shaderProgram, "objectColor");
 
-        for (size_t i = 0; i < bodies.size(); ++i) {
+        for (size_t i = 0; i < count; ++i) {
             // Model matrix
             // Start with identity matrix standing at Origin
             glm::mat4 model = glm::mat4(1.0f);
 
             // Move the cube based on the position calculated from physics
-            glm::vec3 pos((float)bodies[i].position.x, (float)bodies[i].position.y, (float)bodies[i].position.z);
+            glm::vec3 pos((float)positions[i].x, (float)positions[i].y, (float)positions[i].z);
             model = glm::translate(model, pos);
 
             // Categorise volumes to scaling and colour-coding to improve visibility

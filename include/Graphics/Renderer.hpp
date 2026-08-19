@@ -2,8 +2,7 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <vector>
-#include <Physics/Body.hpp>
-
+#include <Math/Vector3.hpp>
 namespace Graphics {
     class Renderer {
         private:
@@ -30,6 +29,6 @@ namespace Graphics {
             void swapBuffers() const;
             void pollEvents() const;
 
-            void draw(const std::vector<Physics::Body>& bodies) const;
+            void draw(size_t count, const std::vector<Vector3>& positions, const std::vector<double>& masses) const;
     };
 }

@@ -1,11 +1,14 @@
 #pragma once
 #include <vector>
-#include <Physics/Body.hpp>
+#include <Math/Vector3.hpp>
 
 namespace Simulation {
     class System {
         private:
-            std::vector<Physics::Body> bodies;
+            std::vector<double> masses;
+            std::vector<Vector3> positions;
+            std::vector<Vector3> velocities;
+            std::vector<Vector3> accelerations;
             double G; // Gravity const
             double dt; // Delta time
 
@@ -15,12 +18,14 @@ namespace Simulation {
             System(double gravityConstant, double timeStep);
 
             // Add a body to simulation
-            void addBody(const Physics::Body& body);
+            void addBody(double mass, const Vector3& pos, const Vector3& vel);
 
             // Execute a delta time jump t (Verlet Algorithm)
             void step();
 
-            // Retrieve the list of objects
-            const std::vector<Physics::Body>& getBodies() const;
+            // Getter functions that allow graphics components to read the data
+            size_t getBodyCount() const { return masses.size(); }
+            const std::vector<Vector3>& getPositions() const { return positions; }
+            const std::vector<double>& getMasses() const { return masses; }
     };
 }
