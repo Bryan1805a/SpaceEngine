@@ -30,7 +30,7 @@ int main() {
         sim.step();
         renderer.clear();
 
-        // Todo
+        renderer.draw(sim.getBodies());
 
         renderer.swapBuffers();
     }
