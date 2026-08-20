@@ -1,39 +1,70 @@
 #include <iostream>
 #include <iomanip>
+#include <random>
+#include <cmath>
 #include <Math/Vector3.hpp>
 #include <Simulation/Simulation.hpp>
 #include <Graphics/Renderer.hpp>
 
 int main() {
-    // Init gravity constant G = 1.0 and delta time = 0.01 second
+    // Initialise Engine
+    // G = 1.0, dt = 0.01
     Simulation::System sim(1.0, 0.01);
 
-    // Add three bodies into space
-    // Body(mass, position, velocity)
-    // Body 0: A large star in the middle, stand still
-    sim.addBody(1000.0, Vector3::Zero, Vector3::Zero);
+    // Create a super-massive gravitational star at the center (Index 0)
+    double centerMass = 10000.0;
+    sim.addBody(centerMass, Vector3::Zero, Vector3::Zero);
 
-    // Body 1: A planet along with x axis
-    sim.addBody(10.0, Vector3(100.0, 0.0, 0.0), Vector3(0.0, 3.16, 0.0));
+    // Init random number generator
+    std::mt19937 gen(42);
+    std::uniform_real_distribution<double> distRadius(100.0, 800.0);
+    std::uniform_real_distribution<double> distAngle(0.0, 2.0 * 3.1415926535);
+    std::uniform_real_distribution<double> distY(-15.0, 15.0);
+    std::uniform_real_distribution<double> distMass(1.0, 5.0);
 
-    // Body 2: A planet along with -x axis
-    sim.addBody(1.0, Vector3(-150, 0.0, 0.0), Vector3(0.0, -2.58, 0.0));
+    // Create 1000 asteroids
+    int numPlanets = 1000;
+    for (int i = 0; i < numPlanets; ++i) {
+       //  Random coordinates with disk shaped
+       double r = distRadius(gen);
+       double theta = distAngle(gen);
 
-    // Init graphics window (1280x720)
-    Graphics::Renderer renderer(1280, 720, "Three-Body Simulation");
+       double x = r * std::cos(theta);
+       double z = r * std::sin(theta);
+       double y = distY(gen);
 
-    std::cout << "Running simulation" << std::endl;
+       Vector3 pos(x, y, z);
 
+       // Calculating tangential velocity to maintain the trajectory
+       double v_mag = std::sqrt(1.0 * centerMass / r);
+
+       // Use the mathematical cross product to obtain a vector perpendicular to the radial direction
+       Vector3 v_dir(z, 0.0, -x);
+       double dir_len = std::hypot(z, x);
+       v_dir = v_dir / dir_len;
+
+       Vector3 vel = v_dir * v_mag;
+
+       // Add to the system
+       sim.addBody(distMass(gen), pos, vel);
+    }
+
+    // Init graphics
+    Graphics::Renderer renderer(1280, 720, "Galaxy Simulation");
+    std::cout << "Initialised 1000 asteroids" << std::endl;
+    std::cout << "Press X to quit" << std::endl;
+
+    // Main loop
     while (!renderer.shouldClose()) {
         renderer.pollEvents();
         sim.step();
         renderer.clear();
 
+        // Upload 1001 objects into GPU
         renderer.draw(sim.getBodyCount(), sim.getPositions(), sim.getMasses());
-
         renderer.swapBuffers();
     }
 
-    std::cout << "Simulation ended" << std::endl;
+    std::cout << "Simulation has ended" << std::endl;
     return 0;
 }
