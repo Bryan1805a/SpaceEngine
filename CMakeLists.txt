@@ -46,6 +46,7 @@ add_executable(three_body
     include/Simulation/Simulation.hpp
     src/Simulation/Simulation.cpp
     src/Graphics/Renderer.cpp
+    src/Physics/Octree.cpp
 )
 
 target_include_directories(three_body PRIVATE
