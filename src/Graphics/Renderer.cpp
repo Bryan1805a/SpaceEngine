@@ -80,6 +80,7 @@ namespace Graphics {
 
             uniform vec3 objectColor;
             uniform vec3 lightPos; // Light source position (Host star)
+            uniform float lightRadius; // Host star's rendered radius
 
             void main() {
                 // Ambient: Very dark to create a tranquil atmosphere
@@ -95,7 +96,7 @@ namespace Graphics {
 
                 // Disable shadow casting for the main star (it emits its own light).
                 vec3 result;
-                if (length(lightPos - FragPos) < 1.0) {
+                if (length(lightPos - FragPos) < lightRadius) {
                     result = objectColor; // The main star does not become dim
                 } else {
                     result = (ambient + diffuse) * objectColor;
@@ -263,8 +264,11 @@ namespace Graphics {
         int modeLoc = glGetUniformLocation(shaderProgram, "model");
         int colorLoc = glGetUniformLocation(shaderProgram, "objectColor");
         int lightPosLoc = glGetUniformLocation(shaderProgram, "lightPos");
+        int lightRadiusLoc = glGetUniformLocation(shaderProgram, "lightRadius");
         if (count > 0) {
             glUniform3f(lightPosLoc, (float)positions[0].x, (float)positions[0].y, (float)positions[0].z);
+            // World-space radius = base sphere radius (0.5) * model scale (cbrt(mass))
+            glUniform1f(lightRadiusLoc, 0.5f * (float)std::cbrt(masses[0]));
         }
 
         for (size_t i = 0; i < count; ++i) {
