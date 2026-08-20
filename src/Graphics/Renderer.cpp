@@ -34,6 +34,18 @@ namespace Graphics {
             return;
         }
 
+        // Init default camera status
+        cameraPos = glm::vec3(0.0f, 150.0f, 300.0f);
+        cameraFront = glm::vec3(0.0f, -0.5f, -1.0f);
+        cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
+        yaw = -90.0f;
+        pitch = -26.5f;
+        lastX = width / 2.0f;
+        lastY = height / 2.0f;
+        firstMouse = true;
+        // Lock the mouse cursor to the center of the screen and hide it
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
         // Set the background color for the space environment
         glClearColor(0.12f, 0.12f, 0.12f, 1.0f);
 
@@ -232,10 +244,6 @@ namespace Graphics {
         glfwSwapBuffers(window);
     }
 
-    void Renderer::pollEvents() const {
-        glfwPollEvents();
-    }
-
     void Renderer::draw(size_t count, const std::vector<Vector3>& positions, const std::vector<double>& masses) const {
         // Activate Shader Program
         glUseProgram(shaderProgram);
@@ -251,9 +259,7 @@ namespace Graphics {
         // View Matrix
         // Position the camera high up (Y=150) and set it back (Z=300)
         // Point the camera direcly down at the origin (0, 0, 0)
-        glm::mat4 view = glm::lookAt(glm::vec3(0.0f, 150.0f, 300.0f),
-                                     glm::vec3(0.0f, 0.0f, 0.0f),
-                                     glm::vec3(0.0f, 1.0f, 0.0f));
+        glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
         int viewLoc = glGetUniformLocation(shaderProgram, "view");
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
 
@@ -307,5 +313,66 @@ namespace Graphics {
 
         // Unbind VAO after drawing is complete
         glBindVertexArray(0);
+    }
+
+    void Renderer::pollEvents() const {
+        glfwPollEvents();
+    }
+
+    void Renderer::processInput(float deltaTine) {
+        // If escape button pressed -> close the window
+        if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+            glfwSetWindowShouldClose(window, true);
+        }
+
+        // Handle W, A, S, D key movement
+        // Flight speed: 150 units/second
+        float cameraSpeed = 150.0f * deltaTine;
+        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+            cameraPos += cameraSpeed * cameraFront;
+        }
+        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+            cameraPos -= cameraSpeed * cameraFront;
+        }
+        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
+            cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
+        }
+        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+            cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
+        }
+
+        // Handling Viewpoint Rotation with the Mouse
+        // Using Trigonometry
+        double xpos, ypos;
+        glfwGetCursorPos(window, &xpos, &ypos);
+
+        if (firstMouse) {
+            lastX = (float)xpos;
+            lastY = (float)ypos;
+            firstMouse = false;
+        }
+
+        float xoffset = (float)xpos - lastX;
+        float yoffset = lastY - (float)ypos; // The mouse's Y-axis is inverted relative to 3D coordinates
+        lastX = (float)xpos;
+        lastY = (float)ypos;
+
+        float sensitivity = 0.1f;
+        xoffset *= sensitivity;
+        yoffset *= sensitivity;
+
+        yaw += xoffset;
+        pitch += yoffset;
+
+        // Lock the tilt angle to prevent the camera from flipping over
+        if (pitch > 89.0f) pitch = 89.0f;
+        if (pitch < -89.0f) pitch = -89.0f;
+
+        // Recalculate the view direction vector using sine and cosine
+        glm::vec3 front;
+        front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+        front.y = sin(glm::radians(pitch));
+        front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+        cameraFront = glm::normalize(front);
     }
 }

@@ -54,9 +54,20 @@ int main() {
     std::cout << "Initialised 1000 asteroids" << std::endl;
     std::cout << "Press X to quit" << std::endl;
 
+    // Delta Time vars
+    float deltaTime = 0.0f;
+    float lastFrame = 0.0f;
+
     // Main loop
     while (!renderer.shouldClose()) {
+        // Update Delta Time
+        float currentFrame = glfwGetTime();
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+
+        // Operating System Event Handling and Movement Logic
         renderer.pollEvents();
+        renderer.processInput(deltaTime);
         sim.step();
         renderer.clear();
 
