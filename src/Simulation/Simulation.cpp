@@ -1,5 +1,7 @@
 #include <Simulation/Simulation.hpp>
 #include <cmath>
+#include <execution>
+#include <numeric>
 
 namespace Simulation {
     System::System(double gravityConstant, double timeStep)
@@ -23,12 +25,19 @@ namespace Simulation {
 
         // Rebuild spacial tree from scratch for current frame
         octree.build();
-
+        
+        // Multithreading
         // Calculate acceleration for each planet by query tree
         double theta = 0.5; // Just choose it for no reason
-        for (size_t i = 0; i < n; ++i) {
+        
+        std::vector<size_t> indices(n);
+        std::iota(indices.begin(), indices.end(), 0);
+
+        // Distribute task to the CPU
+        std::for_each(std::execution::par, indices.begin(), indices.end(), [&](size_t i) {
+            // Each CPU core will automatically take an index i and perform calculations independently
             accelerations[i] = octree.calculateAcceleration(i, theta, G);
-        }
+        });
     }
 
     void System::step() {
