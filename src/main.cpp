@@ -73,6 +73,16 @@ int main() {
 
         // Upload 1001 objects into GPU
         renderer.draw(sim.getBodyCount(), sim.getPositions(), sim.getMasses());
+
+        // Draw UI
+        renderer.beginUI();
+
+        // Init Inspector
+        renderer.renderUI(sim.getBodyCount());
+
+        // UI rendering overlaid on 3D graphics
+        renderer.endUI();
+        
         renderer.swapBuffers();
     }
 

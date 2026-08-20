@@ -5,6 +5,9 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <imgui.h>
+#include <backends/imgui_impl_glfw.h>
+#include <backends/imgui_impl_opengl3.h>
 
 namespace Graphics {
     Renderer::Renderer(int w, int h, const char* title) : width(w), height(h), window(nullptr) {
@@ -55,6 +58,24 @@ namespace Graphics {
         // Preparing GPU data
         initShaders();
         initSphere(36, 18);
+
+        // Init ImGui
+        IMGUI_CHECKVERSION();
+        ImGui::CreateContext();
+        ImGuiIO& io = ImGui::GetIO(); (void)io;
+
+        // Interface customization
+        // Sleek, minimalist Onyx Grey color scheme
+        ImGui::StyleColorsDark();
+        ImGuiStyle& style = ImGui::GetStyle();
+        style.WindowRounding = 5.0f;
+        style.Colors[ImGuiCol_WindowBg] = ImVec4(0.12f, 0.12f, 0.12f, 0.95f);
+        style.Colors[ImGuiCol_TitleBg] = ImVec4(0.08f, 0.08f, 0.08f, 1.0f);
+        style.Colors[ImGuiCol_TitleBgActive] = ImVec4(0.15f, 0.15f, 0.15f, 1.0f);
+
+        // Connect backend
+        ImGui_ImplGlfw_InitForOpenGL(window, true);
+        ImGui_ImplOpenGL3_Init("#version 330 core");
     }
 
     void Renderer::initShaders() {
@@ -221,6 +242,11 @@ namespace Graphics {
     }
 
     Renderer::~Renderer() {
+        // Clean ImGui
+        ImGui_ImplOpenGL3_Shutdown();
+        ImGui_ImplGlfw_Shutdown();
+        ImGui::DestroyContext();
+
         // Clean CPU resources before closing window
         glDeleteVertexArrays(1, &VAO);
         glDeleteBuffers(1, &VBO);
@@ -327,7 +353,7 @@ namespace Graphics {
 
         // Handle W, A, S, D key movement
         // Flight speed: 150 units/second
-        float cameraSpeed = 150.0f * deltaTine;
+        float cameraSpeed = 150.0f * deltaTime;
         if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
             cameraPos += cameraSpeed * cameraFront;
         }
@@ -341,38 +367,75 @@ namespace Graphics {
             cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
         }
 
-        // Handling Viewpoint Rotation with the Mouse
-        // Using Trigonometry
-        double xpos, ypos;
-        glfwGetCursorPos(window, &xpos, &ypos);
 
-        if (firstMouse) {
+        // Unlock mouse cursor while holding Left Alt, re-lock on release
+        if (glfwGetKey(window, GLFW_KEY_LEFT_ALT) == GLFW_PRESS) {
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+            firstMouse = true; // Prevent camera jitter when hiding the mouse cursor
+        }
+        else {
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
+            // Handling Viewpoint Rotation with the Mouse
+            // Using Trigonometry
+            double xpos, ypos;
+            glfwGetCursorPos(window, &xpos, &ypos);
+
+            if (firstMouse) {
+                lastX = (float)xpos;
+                lastY = (float)ypos;
+                firstMouse = false;
+            }
+
+            float xoffset = (float)xpos - lastX;
+            float yoffset = lastY - (float)ypos; // The mouse's Y-axis is inverted relative to 3D coordinates
             lastX = (float)xpos;
             lastY = (float)ypos;
-            firstMouse = false;
+
+            float sensitivity = 0.1f;
+            xoffset *= sensitivity;
+            yoffset *= sensitivity;
+
+            yaw += xoffset;
+            pitch += yoffset;
+
+            // Lock the tilt angle to prevent the camera from flipping over
+            if (pitch > 89.0f) pitch = 89.0f;
+            if (pitch < -89.0f) pitch = -89.0f;
+
+            // Recalculate the view direction vector using sine and cosine
+            glm::vec3 front;
+            front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+            front.y = sin(glm::radians(pitch));
+            front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+            cameraFront = glm::normalize(front);
         }
+    }
 
-        float xoffset = (float)xpos - lastX;
-        float yoffset = lastY - (float)ypos; // The mouse's Y-axis is inverted relative to 3D coordinates
-        lastX = (float)xpos;
-        lastY = (float)ypos;
+    void Renderer::beginUI() const {
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+    }
 
-        float sensitivity = 0.1f;
-        xoffset *= sensitivity;
-        yoffset *= sensitivity;
+    void Renderer::renderUI(size_t bodyCount) {
+        // Create a small Inspector window in the corner of the screen
+        ImGui::Begin("Space Engine Inspector");
 
-        yaw += xoffset;
-        pitch += yoffset;
+        // Display FPS
+        ImGui::Text("Performance: %.1f FPS", ImGui::GetIO().Framerate);
+        ImGui::Separator();
 
-        // Lock the tilt angle to prevent the camera from flipping over
-        if (pitch > 89.0f) pitch = 89.0f;
-        if (pitch < -89.0f) pitch = -89.0f;
+        // A guided text
+        ImGui::TextColored(ImVec4(0.5f, 0.8f, 1.0f, 1.0f), "Navigation:");
+        ImGui::BulletText("Hold 'Left Alt' to unlock mouse");
+        ImGui::BulletText("WASD to move camera");
 
-        // Recalculate the view direction vector using sine and cosine
-        glm::vec3 front;
-        front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
-        front.y = sin(glm::radians(pitch));
-        front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
-        cameraFront = glm::normalize(front);
+        ImGui::End();
+    }
+
+    void Renderer::endUI() const {
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
     }
 }

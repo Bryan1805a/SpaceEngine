@@ -45,5 +45,9 @@ namespace Graphics {
 
             void draw(size_t count, const std::vector<Vector3>& positions, const std::vector<double>& masses) const;
             void processInput(float deltaTime); // Function to read keyboard and mouse input for movement
+
+            void beginUI() const; // Start drawing the interface for the frame
+            void renderUI(size_t bodyCount); // Draw the control panels
+            void endUI() const; // Push the interface to the display GPU
     };
 }
