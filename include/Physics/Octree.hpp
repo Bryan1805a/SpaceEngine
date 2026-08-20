@@ -48,6 +48,9 @@ namespace Physics {
 
             // Recursive planet insertion function
             void insertImpl(int nodeIdx, int bodyIdx);
+
+            // Recursive accelerating calculation function
+            Vector3 calculateAccelImpl(int nodeIdx, int bodyIdx, double theta, double G) const;
         
         public:
             // Initialize a tree of cosmic scale and connect it to SoA data
@@ -55,5 +58,7 @@ namespace Physics {
 
             // Rebuild the entire tree from scratch in every frame
             void build();
+
+            Vector3 calculateAcceleration(int bodyIdx, double theta, double G) const;
     };
 }

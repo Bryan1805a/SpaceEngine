@@ -78,4 +78,47 @@ namespace Physics {
             insertImpl(rootIndex, i);
         }
     }
+
+    Vector3 Octree::calculateAcceleration(int bodyIdx, double theta, double G) const {
+        if (nodes.empty()) return Vector3::Zero;
+        return calculateAccelImpl(rootIndex, bodyIdx, theta, G);
+    }
+
+    Vector3 Octree::calculateAccelImpl(int nodeIdx, int bodyIdx, double theta, double G) const {
+        if (nodeIdx == -1) return Vector3::Zero;
+
+        const OctreeNode& node = nodes[nodeIdx];
+        Vector3 bodyPos = positions[bodyIdx];
+
+        // Rule 1: A planet cannot attract itself
+        if (node.isLeaf() && node.bodyIndex == bodyIdx) {
+            return Vector3::Zero;
+        }
+
+        // Calculate the distance from the planet to the center of mass of a spacial body
+        Vector3 r_vec = node.centerOfMass - bodyPos;
+        double r = r_vec.length();
+
+        // Avoid divided by 0
+        if (r == 0.0) return Vector3::Zero;
+
+        // Rule 2: MAC - Multipole Acceptance Criterion
+        // If the node is a leaf or the Size/Distance ratio is less than the Theta threshold
+        // Then view this entire volume of space as a single, massive object
+        if (node.isLeaf() || (node.size / r < theta)) {
+            double r_cubeb = r * r * r;
+            double accel_term = (G * node.totalMass) / r_cubeb;
+            return r_vec * accel_term;
+        }
+
+        // Rule 3: Node is too close and too large, must go deeper into the smaller block
+        Vector3 totalAccel = Vector3::Zero;
+        for (int i = 0; i < OCTREE_CHILDREN; ++i) {
+            if (node.children[i] != -1) {
+                totalAccel += calculateAccelImpl(node.children[i], bodyIdx, theta, G);
+            }
+        }
+
+        return totalAccel;
+    }
 }
