@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include <Math/Vector3.hpp>
+#include <Physics/Octree.hpp>
 
 namespace Simulation {
     class System {
@@ -9,6 +10,9 @@ namespace Simulation {
             std::vector<Vector3> positions;
             std::vector<Vector3> velocities;
             std::vector<Vector3> accelerations;
+
+            Physics::Octree octree;
+
             double G; // Gravity const
             double dt; // Delta time
 

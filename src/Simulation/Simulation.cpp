@@ -3,7 +3,7 @@
 
 namespace Simulation {
     System::System(double gravityConstant, double timeStep)
-        : G(gravityConstant), dt(timeStep) {}
+        : G(gravityConstant), dt(timeStep), octree(4000.0, positions, masses) {}
 
     void System::addBody(double mass, const Vector3& pos, const Vector3& vel) {
         masses.push_back(mass);
@@ -14,35 +14,20 @@ namespace Simulation {
 
     void System::computeAcceleration() {
         size_t n = masses.size();
+        if (n == 0) return;
 
         // Reset acceleration array to 0
         for (size_t i = 0; i < n; ++i) {
             accelerations[i] = Vector3::Zero;
         }
 
-        // Calculate force and acceleration
+        // Rebuild spacial tree from scratch for current frame
+        octree.build();
+
+        // Calculate acceleration for each planet by query tree
+        double theta = 0.5; // Just choose it for no reason
         for (size_t i = 0; i < n; ++i) {
-            for (size_t j = i + 1; j < n; ++j) {
-                Vector3 r_ij = positions[j] - positions[i];
-                // Calculate the distance r (vector length)
-                double r = r_ij.length();
-
-                // Zero range handle
-                if (r == 0) {
-                    continue;
-                }
-
-                // Calculate the magnitude of the gravitational force divided by the mass
-                // Based on the formula: F = G * m1 * m2 / r^3 * r_vec
-                // Acceleration a1 = F / m1 = G * m2 / r^3 * r_vec
-                double r_cubed = r * r * r;
-                double accel_term_I = (G * masses[j]) / r_cubed;
-                double accel_term_J = (G * masses[i]) / r_cubed;
-
-                // Update acceleration for both objects (Newton's Third Law)
-                accelerations[i] += r_ij * accel_term_I;
-                accelerations[j] -= r_ij * accel_term_J;
-            }
+            accelerations[i] = octree.calculateAcceleration(i, theta, G);
         }
     }
 
