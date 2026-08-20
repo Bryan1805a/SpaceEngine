@@ -185,18 +185,22 @@ namespace Graphics {
             glm::vec3 pos((float)positions[i].x, (float)positions[i].y, (float)positions[i].z);
             model = glm::translate(model, pos);
 
+
             // Categorise volumes to scaling and colour-coding to improve visibility
-            if (i == 0) { // A large star
-                model = glm::scale(model, glm::vec3(10.0f, 10.0f, 10.0f));
-                glUniform3f(colorLoc, 1.0f, 0.8f, 0.2f); // Yellow
+            // Size is proportional to mass (cube root)
+            float radius = (float)std::cbrt(masses[i]);
+            model = glm::scale(model, glm::vec3(radius, radius, radius));
+            
+            // Color temperature: The larger the mass, the brighter the color 
+            // Red -> Blue -> White/Yellow
+            if (masses[i] >= 1000.0) {
+                glUniform3f(colorLoc, 1.0f, 0.8f, 0.2f); // Supermassive star
             }
-            else if (i == 1) {
-                model = glm::scale(model, glm::vec3(3.0f, 3.0f, 3.0f));
-                glUniform3f(colorLoc, 0.2f, 0.6f, 1.0f); // Blue
+            else if (masses[i] >= 50.0) {
+                glUniform3f(colorLoc, 0.2f, 0.6f, 1.0f); // Gas giant
             }
             else {
-                model = glm::scale(model, glm::vec3(2.0f, 2.0f, 2.0f));
-                glUniform3f(colorLoc, 1.0f, 0.3f, 0.2f); // Red
+                glUniform3f(colorLoc, 0.7f, 0.3f, 0.2f); // Rocky asteroid
             }
 
             // Send this object's own model matrix to the GPU
