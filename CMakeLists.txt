@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 4.0)
 
-project(ThreeBodySimulation
+project(NBodySimulation
     VERSION 0.1.0
     LANGUAGES CXX
 )
@@ -40,7 +40,7 @@ FetchContent_MakeAvailable(glm)
 
 find_package(OpenGL REQUIRED)
 
-add_executable(three_body
+add_executable(n_body
     src/main.cpp
     src/glad.c
     include/Simulation/Simulation.hpp
@@ -49,11 +49,11 @@ add_executable(three_body
     src/Physics/Octree.cpp
 )
 
-target_include_directories(three_body PRIVATE
+target_include_directories(n_body PRIVATE
     "${CMAKE_SOURCE_DIR}/include"
 )
 
-target_link_libraries(three_body PRIVATE 
+target_link_libraries(n_body PRIVATE 
     glfw
     glm::glm
     OpenGL::GL
