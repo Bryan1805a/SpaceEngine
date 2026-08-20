@@ -38,6 +38,16 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(glm)
 
+# 3. Download Dear ImGui
+message(STATUS "Downloading Dear ImGui...")
+FetchContent_Declare(
+    imgui
+    GIT_REPOSITORY https://github.com/ocornut/imgui.git
+    GIT_TAG        v1.92.9b
+)
+FetchContent_MakeAvailable(imgui)
+FetchContent_GetProperties(imgui SOURCE_DIR imgui_dir)
+
 find_package(OpenGL REQUIRED)
 
 add_executable(n_body
@@ -47,13 +57,23 @@ add_executable(n_body
     src/Simulation/Simulation.cpp
     src/Graphics/Renderer.cpp
     src/Physics/Octree.cpp
+
+    # Compiling with ImGui source code
+    ${imgui_dir}/imgui.cpp
+    ${imgui_dir}/imgui_draw.cpp
+    ${imgui_dir}/imgui_tables.cpp
+    ${imgui_dir}/imgui_widgets.cpp
+    ${imgui_dir}/backends/imgui_impl_glfw.cpp
+    ${imgui_dir}/backends/imgui_impl_opengl3.cpp
 )
 
 target_include_directories(n_body PRIVATE
     "${CMAKE_SOURCE_DIR}/include"
+    ${imgui_dir}
+    ${imgui_dir}/backends
 )
 
-target_link_libraries(n_body PRIVATE 
+target_link_libraries(n_body PRIVATE
     glfw
     glm::glm
     OpenGL::GL
