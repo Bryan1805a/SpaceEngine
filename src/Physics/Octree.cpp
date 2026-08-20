@@ -30,37 +30,42 @@ namespace Physics {
         // Update the total mass and center of mass 
         // for this node during the downward pass.
         double newTotalMass = node.totalMass + bodyMass;
-        node.centerOfMass = (node.centerOfMass * node.totalMass + bodyPos + bodyMass) / newTotalMass;
+        node.centerOfMass = (node.centerOfMass * node.totalMass + bodyPos * bodyMass) / newTotalMass;
         node.totalMass = newTotalMass;
 
         // If this node is Leaf
         if (node.isLeaf()) {
             // If it is empty
             if (node.bodyIndex == -1) {
-                node.bodyIndex == bodyIdx;
+                node.bodyIndex = bodyIdx;
                 return;
             }
 
             // If it is not empty (Space collision)
             // Subdivide into 8
-            double quarterSize = node.size / 4.0;
+            // Capture parent center/size before creating children,
+            // because createNode() may reallocate the node vector and
+            // invalidate any saved references.
+            Vector3 parentCenter = node.center;
+            double parentSize = node.size;
+            double quarterSize = parentSize / 4.0;
             for (int i = 0; i < OCTREE_CHILDREN; ++i) {
                 // Calculate coordinates of centroid for each block
                 double offsetX = ((i & 1) ? quarterSize : -quarterSize);
                 double offsetY = ((i & 2) ? quarterSize : -quarterSize);
                 double offsetZ = ((i & 4) ? quarterSize : -quarterSize);
 
-                Vector3 childCenter = node.center + Vector3(offsetX, offsetY, offsetZ);
-                node.children[i] = createNode(childCenter, node.size / 2.0);
+                Vector3 childCenter = parentCenter + Vector3(offsetX, offsetY, offsetZ);
+                nodes[nodeIdx].children[i] = createNode(childCenter, parentSize / 2.0);
             }
 
             // Move the old body down below
-            int oldBodyIdx = node.bodyIndex;
-            node.bodyIndex = -1; // This node become branch
+            int oldBodyIdx = nodes[nodeIdx].bodyIndex;
+            nodes[nodeIdx].bodyIndex = -1; // This node become branch
 
-            // Recursive to move the old body down
-            int oldOctant = getOctant(node.center, positions[oldBodyIdx]);
-            insertImpl(node.children[oldOctant], oldBodyIdx);
+                // Recursive to move the old body down
+            int oldOctant = getOctant(nodes[nodeIdx].center, positions[oldBodyIdx]);
+            insertImpl(nodes[nodeIdx].children[oldOctant], oldBodyIdx);
         }
 
         // If this node is a branch
