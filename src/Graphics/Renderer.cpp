@@ -319,7 +319,7 @@ namespace Graphics {
         glfwPollEvents();
     }
 
-    void Renderer::processInput(float deltaTine) {
+    void Renderer::processInput(float deltaTime) {
         // If escape button pressed -> close the window
         if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
             glfwSetWindowShouldClose(window, true);
