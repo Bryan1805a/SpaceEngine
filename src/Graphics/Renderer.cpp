@@ -1,5 +1,7 @@
-#include <Graphics/Renderer.hpp>
 #include <iostream>
+#include <cmath>
+#include <vector>
+#include <Graphics/Renderer.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -40,7 +42,7 @@ namespace Graphics {
 
         // Preparing GPU data
         initShaders();
-        initCube();
+        initSphere(36, 18);
     }
 
     void Renderer::initShaders() {
@@ -48,13 +50,23 @@ namespace Graphics {
         const char* vertexShaderSource = R"glsl(
             #version 330 core
             layout (location = 0) in vec3 aPos;
+            layout (location = 1) in vec3 aNormal;
+
+            out vec3 FragPos; // Passing world coordinates to the fragment shader
+            out vec3 Normal; // Passing normal to the fragment shader
 
             uniform mat4 model;
             uniform mat4 view;
             uniform mat4 projection;
 
             void main() {
-                gl_Position = projection * view * model * vec4(aPos, 1.0);
+                FragPos = vec3(model * vec4(aPos, 1.0));
+
+                // Normal matrix
+                // Avoid distortion when scaling
+                Normal = mat3(transpose(inverse(model))) * aNormal;
+
+                gl_Position = projection * view * vec4(FragPos, 1.0);
             }
         )glsl";
 
@@ -62,11 +74,34 @@ namespace Graphics {
         const char* fragmentShaderSource = R"glsl(
             #version 330 core
             out vec4 FragColor;
+            
+            in vec3 FragPos;
+            in vec3 Normal;
 
             uniform vec3 objectColor;
+            uniform vec3 lightPos; // Light source position (Host star)
 
             void main() {
-                FragColor = vec4(objectColor, 1.0);
+                // Ambient: Very dark to create a tranquil atmosphere
+                float ambientStrength = 0.05; 
+                vec3 ambient = ambientStrength * vec3(1.0, 1.0, 1.0);
+
+                // Diffuse scattering
+                // Illuminates only the side facing the light source
+                vec3 norm = normalize(Normal);
+                vec3 lightDir = normalize(lightPos - FragPos);
+                float diff = max(dot(norm, lightDir), 0.0);
+                vec3 diffuse = diff * vec3(1.0, 1.0, 0.9); // The light has a slight yellowish tint
+
+                // Disable shadow casting for the main star (it emits its own light).
+                vec3 result;
+                if (length(lightPos - FragPos) < 1.0) {
+                    result = objectColor; // The main star does not become dim
+                } else {
+                    result = (ambient + diffuse) * objectColor;
+                }
+                
+                FragColor = vec4(result, 1.0);
             }
         )glsl";
 
@@ -92,31 +127,83 @@ namespace Graphics {
         glDeleteShader(fragmentShader);
     }
 
-    void Renderer::initCube() {
-        float vertices[] = {
-            -0.5f, -0.5f, -0.5f,  0.5f, -0.5f, -0.5f,  0.5f,  0.5f, -0.5f,  0.5f,  0.5f, -0.5f, -0.5f,  0.5f, -0.5f, -0.5f, -0.5f, -0.5f,
-            -0.5f, -0.5f,  0.5f,  0.5f, -0.5f,  0.5f,  0.5f,  0.5f,  0.5f,  0.5f,  0.5f,  0.5f, -0.5f,  0.5f,  0.5f, -0.5f, -0.5f,  0.5f,
-            -0.5f,  0.5f,  0.5f, -0.5f,  0.5f, -0.5f, -0.5f, -0.5f, -0.5f, -0.5f, -0.5f, -0.5f, -0.5f, -0.5f,  0.5f, -0.5f,  0.5f,  0.5f,
-             0.5f,  0.5f,  0.5f,  0.5f,  0.5f, -0.5f,  0.5f, -0.5f, -0.5f,  0.5f, -0.5f, -0.5f,  0.5f, -0.5f,  0.5f,  0.5f,  0.5f,  0.5f,
-            -0.5f, -0.5f, -0.5f,  0.5f, -0.5f, -0.5f,  0.5f, -0.5f,  0.5f,  0.5f, -0.5f,  0.5f, -0.5f, -0.5f,  0.5f, -0.5f, -0.5f, -0.5f,
-            -0.5f,  0.5f, -0.5f,  0.5f,  0.5f, -0.5f,  0.5f,  0.5f,  0.5f,  0.5f,  0.5f,  0.5f, -0.5f,  0.5f,  0.5f, -0.5f,  0.5f, -0.5f
-        };
+    void Renderer::initSphere(int sectorCount, int stackCount) {
+        std::vector<float> vertices;
+        std::vector<unsigned int> indices;
 
-        // Allocate 1 VAO and VBO
+        float radius = 0.5f;
+        float sectorStep = 2 * 3.14159265359f / sectorCount;
+        float stackStep = 3.14159265359f / stackCount;
+        float sectorAngle, stackAngle;
+
+        // Generating Vertex Coordinates and Normal Vectors
+        for (int i = 0; i <= stackCount; ++i) {
+            stackAngle = 3.14159265359f / 2 - i * stackStep; // The angle from π/2 to -π/2
+            float xy = radius * std::cos(stackAngle);
+            float z = radius * std::sin(stackAngle);
+
+            for (int j = 0; j <= sectorCount; ++j) {
+                sectorAngle = j * sectorStep; // The angle from 0 to 2*π
+
+                // Vertex coordinates (Position)
+                float x = xy * std::cos(sectorAngle);
+                float y = xy * std::sin(sectorAngle);
+                vertices.push_back(x);
+                vertices.push_back(y);
+                vertices.push_back(z);
+
+                // Normal vector - Used to calculate incident light
+                // For a sphere centered at (0, 0, 0)
+                // The normal vector is simply the normalized vertex coordinates (divided by the radius)
+                vertices.push_back(x / radius);
+                vertices.push_back(y / radius);
+                vertices.push_back(z / radius);
+            }
+        }
+
+        // Generate indices to connect vertices into triangles
+        for (int i = 0; i < stackCount; ++i) {
+            int k1 = i * (sectorCount + 1); // Head of current parallel
+            int k2 = k1 + sectorCount + 1; // Head of next parallel
+
+            for (int j = 0; j < sectorCount; ++j, ++k1, ++k2) {
+                if (i != 0) {
+                    indices.push_back(k1);
+                    indices.push_back(k2);
+                    indices.push_back(k1 + 1);
+                }
+                if (i != (stackCount - 1)) {
+                    indices.push_back(k1 + 1);
+                    indices.push_back(k2);
+                    indices.push_back(k2 + 1);
+                }
+            }
+        }
+        indexCount = indices.size();
+
+        // Load data to VRAM (Including EBO)
+        unsigned int EBO;
         glGenVertexArrays(1, &VAO);
         glGenBuffers(1, &VBO);
+        glGenBuffers(1, &EBO); // Element Buffer Object is used to store an array of indices
 
-        // Bind VAO
         glBindVertexArray(VAO);
 
-        // Bind VBO and push vertices array from RAM to VRAM
         glBindBuffer(GL_ARRAY_BUFFER, VBO);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-        glEnableVertexAttribArray(0);
+        glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), indices.data(), GL_STATIC_DRAW);
 
-        // Unlock VAO and VBO
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        // Declare how to read VBO
+        // Now each vertex has 6 real numbers: 3 Coordinates + 3 Normals
+        int stride = 6 * sizeof(float);
+        // Attribute 0: Coordinates (aPos)
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)0);
+        glEnableVertexAttribArray(0);
+        // Attribute 1: aNormal - Shift by 3 floats
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void*)(3 * sizeof(float)));
+        glEnableVertexAttribArray(1);
+
         glBindVertexArray(0);
     }
 
@@ -175,6 +262,10 @@ namespace Graphics {
 
         int modeLoc = glGetUniformLocation(shaderProgram, "model");
         int colorLoc = glGetUniformLocation(shaderProgram, "objectColor");
+        int lightPosLoc = glGetUniformLocation(shaderProgram, "lightPos");
+        if (count > 0) {
+            glUniform3f(lightPosLoc, (float)positions[0].x, (float)positions[0].y, (float)positions[0].z);
+        }
 
         for (size_t i = 0; i < count; ++i) {
             // Model matrix
@@ -207,7 +298,7 @@ namespace Graphics {
             glUniformMatrix4fv(modeLoc, 1, GL_FALSE, glm::value_ptr(model));
 
             // Draw command: Drawing 36 vertices from VBO (Forming a cube)
-            glDrawArrays(GL_TRIANGLES, 0, 36);
+            glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, 0);
         }
 
         // Unbind VAO after drawing is complete

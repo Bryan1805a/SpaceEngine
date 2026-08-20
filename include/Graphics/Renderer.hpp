@@ -16,7 +16,10 @@ namespace Graphics {
 
             // Local init vars
             void initShaders();
-            void initCube();
+            void initSphere(int sectorCount, int stackCount);
+
+            // A variable storing the number of triangles so the draw function knows how many to draw
+            unsigned int indexCount;
         
         public:
             Renderer(int w, int h, const char* title);
