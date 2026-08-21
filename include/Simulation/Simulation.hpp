@@ -2,6 +2,8 @@
 #include <vector>
 #include <Math/Vector3.hpp>
 #include <Physics/Octree.hpp>
+#include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 namespace Simulation {
     class System {
@@ -10,6 +12,10 @@ namespace Simulation {
             std::vector<Vector3> positions;
             std::vector<Vector3> velocities;
             std::vector<Vector3> accelerations;
+
+            // Quaternion array
+            std::vector<glm::quat> orientations; // Current direction of rotation
+            std::vector<glm::vec3> angularVelocities; // Angular velocity (Rotation axis + Speed)
 
             Physics::Octree octree;
 
@@ -23,7 +29,8 @@ namespace Simulation {
             System(double gravityConstant, double timeStep);
 
             // Add a body to simulation
-            void addBody(double mass, const Vector3& pos, const Vector3& vel);
+            void addBody(double mass, const Vector3& pos, const Vector3& vel, const glm::vec3& angularVel = glm::vec3(0.0f));
+            const std::vector<glm::quat>& getOrientations() const { return orientations; }
 
             // Getter functions that allow graphics components to read the data
             size_t getBodyCount() const { return masses.size(); }

@@ -7,11 +7,36 @@ namespace Simulation {
     System::System(double gravityConstant, double timeStep)
         : G(gravityConstant), dt(timeStep), octree(4000.0, positions, masses) {}
 
-    void System::addBody(double mass, const Vector3& pos, const Vector3& vel) {
+    void System::addBody(double mass, const Vector3& pos, const Vector3& vel, const glm::vec3& angularVel) {
         masses.push_back(mass);
         positions.push_back(pos);
         velocities.push_back(vel);
         accelerations.push_back(Vector3::Zero); // The initial acceleration is always zero
+
+        // Identity Quaternion
+        orientations.push_back(glm::quat(1.0f, 0.0f, 0.0f, 0.0f));
+        angularVelocities.push_back(angularVel);
+    }
+
+    void System::removeBody(size_t index) {
+        if (index >= masses.size()) return;
+
+        // Swap the last element with the element to be deleted
+        size_t lastIdx = masses.size() - 1;
+        masses[index] = masses[lastIdx];
+        positions[index] = positions[lastIdx];
+        velocities[index] = velocities[lastIdx];
+        accelerations[index] = accelerations[lastIdx];
+        orientations[index] = orientations[lastIdx];
+        angularVelocities[index] = angularVelocities[lastIdx];
+
+        // Pop last index
+        masses.pop_back();
+        positions.pop_back();
+        velocities.pop_back();
+        accelerations.pop_back();
+        orientations.pop_back();
+        angularVelocities.pop_back();
     }
 
     void System::computeAcceleration() {
@@ -73,12 +98,16 @@ namespace Simulation {
                     positions[j] = positions[lastIdx];
                     velocities[j] = velocities[lastIdx];
                     accelerations[j] = accelerations[lastIdx];
+                    orientations[j] = orientations[lastIdx];
+                    angularVelocities[j] = angularVelocities[lastIdx];
 
                     // Delete last index
                     masses.pop_back();
                     positions.pop_back();
                     velocities.pop_back();
                     accelerations.pop_back();
+                    orientations.pop_back();
+                    angularVelocities.pop_back();
                 }
                 else {
                     ++j;
@@ -99,6 +128,17 @@ namespace Simulation {
             velocities[i] += accelerations[i] * (0.5 * dt);
         }
 
+        // Update orientation based on angular velocity
+        for (size_t i = 0; i < n; ++i) {
+            float speed = glm::length(angularVelocities[i]); // Rotate speed (Radian/s)
+            if (speed > 0.0001f) {
+                // Create a quaternion representing the rotation over a single frame (dt)
+                glm::vec3 axis = angularVelocities[i] / speed;
+                glm::quat spin = glm::angleAxis(speed * (float)dt, axis);
+                orientations[i] = glm::normalize(spin * orientations[i]);
+            }
+        }
+
         // Calculate new acceleration based on the newly updated new position
         computeAcceleration();
 
@@ -109,22 +149,5 @@ namespace Simulation {
         }
 
         handleCollisions();
-    }
-
-    void System::removeBody(size_t index) {
-        if (index >= masses.size()) return;
-
-        // Swap the last element with the element to be deleted
-        size_t lastIdx = masses.size() - 1;
-        masses[index] = masses[lastIdx];
-        positions[index] = positions[lastIdx];
-        velocities[index] = velocities[lastIdx];
-        accelerations[index] = accelerations[lastIdx];
-
-        // Pop last index
-        masses.pop_back();
-        positions.pop_back();
-        velocities.pop_back();
-        accelerations.pop_back();
     }
 }
