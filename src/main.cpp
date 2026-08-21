@@ -7,7 +7,7 @@
 #include <Simulation/Simulation.hpp>
 #include <Graphics/Renderer.hpp>
 
-int raycast(const glm::vec3& rayOrigin, const glm::vec3& rayDir, const std::vector<Vector3> positions, const std::vector<double>& masses) {
+int raycast(const glm::vec3& rayOrigin, const glm::vec3& rayDir, const std::vector<Vector3>& positions, const std::vector<double>& masses) {
     int hitIndex = -1;
     float minDistance = 999999.0f; // Find the nearest planet if the ray passes through multiple planets
 
