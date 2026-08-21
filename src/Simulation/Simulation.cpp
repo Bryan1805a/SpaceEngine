@@ -110,4 +110,21 @@ namespace Simulation {
 
         handleCollisions();
     }
+
+    void System::removeBody(size_t index) {
+        if (index >= masses.size()) return;
+
+        // Swap the last element with the element to be deleted
+        size_t lastIdx = masses.size() - 1;
+        masses[index] = masses[lastIdx];
+        positions[index] = positions[lastIdx];
+        velocities[index] = velocities[lastIdx];
+        accelerations[index] = accelerations[lastIdx];
+
+        // Pop last index
+        masses.pop_back();
+        positions.pop_back();
+        velocities.pop_back();
+        accelerations.pop_back();
+    }
 }

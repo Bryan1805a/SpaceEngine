@@ -32,5 +32,11 @@ namespace Simulation {
 
             // Execute a delta time jump t (Verlet Algorithm)
             void step();
+
+            // Change delta time function
+            void SetDt(double newDt) {dt = newDt;}
+
+            // Remove a body
+            void removeBody(size_t index);
     };
 }
