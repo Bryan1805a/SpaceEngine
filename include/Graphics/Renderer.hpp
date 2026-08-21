@@ -47,7 +47,16 @@ namespace Graphics {
             void processInput(float deltaTime); // Function to read keyboard and mouse input for movement
 
             void beginUI() const; // Start drawing the interface for the frame
-            void renderUI(size_t bodyCount); // Draw the control panels
             void endUI() const; // Push the interface to the display GPU
+
+            // Get camera data for UI
+            glm::vec3 getCameraPos() const {return cameraPos;}
+            glm::vec3 getCameraFront() const {return cameraFront;}
+
+            // Declare a function to expose the window to main.cpp for reading the ALT key
+            GLFWwindow* getWindow() const {return window;}
+
+            // Declare a function to calculate the ray direction
+            glm::vec3 getRayDirection(float mouseX, float mouseY) const;
     };
 }

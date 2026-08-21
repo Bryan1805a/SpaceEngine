@@ -418,24 +418,27 @@ namespace Graphics {
         ImGui::NewFrame();
     }
 
-    void Renderer::renderUI(size_t bodyCount) {
-        // Create a small Inspector window in the corner of the screen
-        ImGui::Begin("Space Engine Inspector");
-
-        // Display FPS
-        ImGui::Text("Performance: %.1f FPS", ImGui::GetIO().Framerate);
-        ImGui::Separator();
-
-        // A guided text
-        ImGui::TextColored(ImVec4(0.5f, 0.8f, 1.0f, 1.0f), "Navigation:");
-        ImGui::BulletText("Hold 'Left Alt' to unlock mouse");
-        ImGui::BulletText("WASD to move camera");
-
-        ImGui::End();
-    }
-
     void Renderer::endUI() const {
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+    }
+
+    glm::vec3 Renderer::getRayDirection(float mouseX, float mouseY) const {
+        // Convert pixel coordinates to normalized NDC coordinates (-1.0 to 1.0)
+        float x = (2.0f * mouseX) / width - 1.0f;
+        float y = 1.0f - (2.0f * mouseY) / height; // The screen's Y-axis is inverted relative to the 3D view
+        glm::vec4 ray_clip(x, y, -1.0f, 1.0f); // The ray starts from the near plane
+
+        // View Space with Inverse Matrix
+        glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)width / (float)height, 0.1f, 1000.0f);
+        glm::vec4 ray_eye = glm::inverse(projection) * ray_clip;
+        ray_eye = glm::vec4(ray_eye.x, ray_eye.y, -1.0f, 0.0f); // Set w=0 to turn it into a direction vector
+
+        // View Space to World Space
+        glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
+        glm::vec3 ray_wor = glm::vec3(glm::inverse(view) * ray_eye);
+
+        // Returns the normalized direction vector
+        return glm::normalize(ray_wor);
     }
 }
