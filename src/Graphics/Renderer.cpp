@@ -58,6 +58,7 @@ namespace Graphics {
         // Preparing GPU data
         initShaders();
         initSphere(36, 18);
+        initFBO();
 
         // Init ImGui
         IMGUI_CHECKVERSION();
@@ -69,9 +70,17 @@ namespace Graphics {
         ImGui::StyleColorsDark();
         ImGuiStyle& style = ImGui::GetStyle();
         style.WindowRounding = 5.0f;
-        style.Colors[ImGuiCol_WindowBg] = ImVec4(0.12f, 0.12f, 0.12f, 0.95f);
-        style.Colors[ImGuiCol_TitleBg] = ImVec4(0.08f, 0.08f, 0.08f, 1.0f);
-        style.Colors[ImGuiCol_TitleBgActive] = ImVec4(0.15f, 0.15f, 0.15f, 1.0f);
+        style.FrameRounding = 0.0f;
+        style.WindowBorderSize = 1.0f;
+
+        // Configure the color with an Alpha channel (4th parameter) for transparency
+        // Window background: Solid black with 60% transparency
+        style.Colors[ImGuiCol_WindowBg] = ImVec4(0.02f, 0.02f, 0.02f, 0.60f);
+        style.Colors[ImGuiCol_TitleBg] = ImVec4(0.08f, 0.08f, 0.08f, 0.80f);
+        style.Colors[ImGuiCol_TitleBgActive] = ImVec4(0.15f, 0.15f, 0.15f, 0.90f);
+        style.Colors[ImGuiCol_Border] = ImVec4(0.40f, 0.40f, 0.40f, 0.30f);
+        style.Colors[ImGuiCol_FrameBg] = ImVec4(0.10f, 0.10f, 0.10f, 0.70f);
+        style.Colors[ImGuiCol_Button] = ImVec4(0.20f, 0.20f, 0.20f, 0.70f);
 
         // Connect backend
         ImGui_ImplGlfw_InitForOpenGL(window, true);
@@ -111,31 +120,63 @@ namespace Graphics {
             in vec3 FragPos;
             in vec3 Normal;
 
-            uniform vec3 objectColor;
-            uniform vec3 lightPos; // Light source position (Host star)
+            uniform vec3 lightPos; 
             uniform float lightRadius; // Host star's rendered radius
 
             void main() {
-                // Ambient: Very dark to create a tranquil atmosphere
-                float ambientStrength = 0.05; 
+                // Ambient: Almost pitch-black, creating a sense of emptiness
+                float ambientStrength = 0.02; 
                 vec3 ambient = ambientStrength * vec3(1.0, 1.0, 1.0);
 
-                // Diffuse scattering
-                // Illuminates only the side facing the light source
+                // Diffuse: Crisp white light
                 vec3 norm = normalize(Normal);
                 vec3 lightDir = normalize(lightPos - FragPos);
                 float diff = max(dot(norm, lightDir), 0.0);
-                vec3 diffuse = diff * vec3(1.0, 1.0, 0.9); // The light has a slight yellowish tint
+                vec3 diffuse = diff * vec3(0.9, 0.9, 0.9); 
 
-                // Disable shadow casting for the main star (it emits its own light).
                 vec3 result;
+                // If it is the Host Star (very close to lightPos)
+                // Glows with a brilliant white light
                 if (length(lightPos - FragPos) < lightRadius) {
-                    result = objectColor; // The main star does not become dim
+                    result = vec3(1.0, 1.0, 1.0); 
                 } else {
-                    result = (ambient + diffuse) * objectColor;
+                    // Planets that are solely ash-gray (Base color: 0.3) absorb light
+                    vec3 planetBaseColor = vec3(0.3, 0.3, 0.3);
+                    result = (ambient + diffuse) * planetBaseColor;
                 }
                 
                 FragColor = vec4(result, 1.0);
+            }
+        )glsl";
+
+        // SCREEN SHADER (POST-PROCESSING)
+        const char* screenVertexShaderSource = R"glsl(
+            #version 330 core
+            layout (location = 0) in vec2 aPos;
+            layout (location = 1) in vec2 aTexCoords;
+            out vec2 TexCoords;
+            void main() {
+                TexCoords = aTexCoords;
+                gl_Position = vec4(aPos.x, aPos.y, 0.0, 1.0);
+            }
+        )glsl";
+
+        const char* screenFragmentShaderSource = R"glsl(
+            #version 330 core
+            out vec4 FragColor;
+            in vec2 TexCoords;
+            uniform sampler2D screenTexture;
+
+            void main() {
+                vec3 col = texture(screenTexture, TexCoords).rgb;
+                
+                // Vignette effect (Darkening the four corners)
+                vec2 center = TexCoords - vec2(0.5);
+                float dist = length(center);
+                float vignette = smoothstep(0.8, 0.2, dist);
+                col *= vignette;
+
+                FragColor = vec4(col, 1.0);
             }
         )glsl";
 
@@ -159,6 +200,26 @@ namespace Graphics {
         // Delete temporary shader files
         glDeleteShader(vertexShader);
         glDeleteShader(fragmentShader);
+
+        // Compile Screen Vertex Shader
+        unsigned int screenVertexShader = glCreateShader(GL_VERTEX_SHADER);
+        glShaderSource(screenVertexShader, 1, &screenVertexShaderSource, NULL);
+        glCompileShader(screenVertexShader);
+
+        // Compile Screen Fragment Shader
+        unsigned int screenFragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+        glShaderSource(screenFragmentShader, 1, &screenFragmentShaderSource, NULL);
+        glCompileShader(screenFragmentShader);
+
+        // Link screen shader program
+        screenShaderProgram = glCreateProgram();
+        glAttachShader(screenShaderProgram, screenVertexShader);
+        glAttachShader(screenShaderProgram, screenFragmentShader);
+        glLinkProgram(screenShaderProgram);
+
+        // Delete temporary screen shader files
+        glDeleteShader(screenVertexShader);
+        glDeleteShader(screenFragmentShader);
     }
 
     void Renderer::initSphere(int sectorCount, int stackCount) {
@@ -251,6 +312,7 @@ namespace Graphics {
         glDeleteVertexArrays(1, &VAO);
         glDeleteBuffers(1, &VBO);
         glDeleteProgram(shaderProgram);
+        glDeleteProgram(screenShaderProgram);
 
         if (window) {
             glfwDestroyWindow(window);
@@ -271,6 +333,12 @@ namespace Graphics {
     }
 
     void Renderer::draw(size_t count, const std::vector<Vector3>& positions, const std::vector<double>& masses) const {
+        // Render the 3D universe to a Frame Buffer Object (FBO)
+        glBindFramebuffer(GL_FRAMEBUFFER, FBO);
+        glEnable(GL_DEPTH_TEST);
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        
         // Activate Shader Program
         glUseProgram(shaderProgram);
 
@@ -294,7 +362,6 @@ namespace Graphics {
         glBindVertexArray(VAO);
 
         int modeLoc = glGetUniformLocation(shaderProgram, "model");
-        int colorLoc = glGetUniformLocation(shaderProgram, "objectColor");
         int lightPosLoc = glGetUniformLocation(shaderProgram, "lightPos");
         int lightRadiusLoc = glGetUniformLocation(shaderProgram, "lightRadius");
         if (count > 0) {
@@ -317,18 +384,6 @@ namespace Graphics {
             // Size is proportional to mass (cube root)
             float radius = (float)std::cbrt(masses[i]);
             model = glm::scale(model, glm::vec3(radius, radius, radius));
-            
-            // Color temperature: The larger the mass, the brighter the color 
-            // Red -> Blue -> White/Yellow
-            if (masses[i] >= 1000.0) {
-                glUniform3f(colorLoc, 1.0f, 0.8f, 0.2f); // Supermassive star
-            }
-            else if (masses[i] >= 50.0) {
-                glUniform3f(colorLoc, 0.2f, 0.6f, 1.0f); // Gas giant
-            }
-            else {
-                glUniform3f(colorLoc, 0.7f, 0.3f, 0.2f); // Rocky asteroid
-            }
 
             // Send this object's own model matrix to the GPU
             glUniformMatrix4fv(modeLoc, 1, GL_FALSE, glm::value_ptr(model));
@@ -337,8 +392,20 @@ namespace Graphics {
             glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, 0);
         }
 
+        // Paste the FBO image onto the screen and apply a filter
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glDisable(GL_DEPTH_TEST);
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        glUseProgram(screenShaderProgram);
+        glUniform1i(glGetUniformLocation(screenShaderProgram, "screenTexture"), 0);
+        glBindVertexArray(quadVAO);
+        glBindTexture(GL_TEXTURE_2D, textureColorbuffer);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+
         // Unbind VAO after drawing is complete
         glBindVertexArray(0);
+        glEnable(GL_DEPTH_TEST);
     }
 
     void Renderer::pollEvents() const {
@@ -440,5 +507,49 @@ namespace Graphics {
 
         // Returns the normalized direction vector
         return glm::normalize(ray_wor);
+    }
+
+    void Renderer::initFBO() {
+        // Create FBO
+        glGenFramebuffers(1, &FBO);
+        glBindFramebuffer(GL_FRAMEBUFFER, FBO);
+
+        // Create a texture to store the colors of the universe
+        glGenTextures(1, &textureColorbuffer);
+        glBindTexture(GL_TEXTURE_2D, textureColorbuffer);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        // Assign Texture to FBO
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureColorbuffer, 0);
+
+        // Create RBP to processing Depth
+        glGenRenderbuffers(1, &RBO);
+        glBindRenderbuffer(GL_RENDERBUFFER, RBO);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, RBO);
+
+        // Return default FBO of display
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+        // Init Screen Quad
+        float quadVertices[] = {
+            // Coordinates (X, Y)   // Texture Coordinate (U, V)
+            -1.0f,  1.0f,           0.0f, 1.0f,
+            -1.0f, -1.0f,           0.0f, 0.0f,
+             1.0f, -1.0f,           1.0f, 0.0f,
+            -1.0f,  1.0f,           0.0f, 1.0f,
+             1.0f, -1.0f,           1.0f, 0.0f,
+             1.0f,  1.0f,           1.0f, 1.0f
+        };
+        glGenVertexArrays(1, &quadVAO);
+        glGenBuffers(1, &quadVBO);
+        glBindVertexArray(quadVAO);
+        glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
     }
 }

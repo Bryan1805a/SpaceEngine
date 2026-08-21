@@ -32,6 +32,16 @@ namespace Graphics {
             float lastX; // Mouse X-coordinate in the previous frame
             float lastY; // Mouse Y-coordinate in the previous frame
             bool firstMouse; // First mouse-over check
+
+            // Post-Processing and FBO
+            unsigned int FBO;
+            unsigned int textureColorbuffer;
+            unsigned int RBO; // Renderbuffer for Depth
+
+            unsigned int quadVAO, quadVBO;
+            unsigned int screenShaderProgram;
+
+            void initFBO();
         public:
             Renderer(int w, int h, const char* title);
 
