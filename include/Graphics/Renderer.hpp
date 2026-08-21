@@ -42,6 +42,11 @@ namespace Graphics {
             unsigned int screenShaderProgram;
 
             void initFBO();
+
+            // Gaussian Blur
+            unsigned int pingpongFBO[2];
+            unsigned int pingpongColorbuffers[2];
+            unsigned int blurShaderProgram;
         public:
             Renderer(int w, int h, const char* title);
 
@@ -68,5 +73,7 @@ namespace Graphics {
 
             // Declare a function to calculate the ray direction
             glm::vec3 getRayDirection(float mouseX, float mouseY) const;
+
+            unsigned int getBlurredTexture() const { return pingpongColorbuffers[0]; }
     };
 }

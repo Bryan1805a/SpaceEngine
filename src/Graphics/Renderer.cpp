@@ -75,7 +75,7 @@ namespace Graphics {
 
         // Configure the color with an Alpha channel (4th parameter) for transparency
         // Window background: Solid black with 60% transparency
-        style.Colors[ImGuiCol_WindowBg] = ImVec4(0.02f, 0.02f, 0.02f, 0.60f);
+        style.Colors[ImGuiCol_WindowBg] = ImVec4(0.02f, 0.02f, 0.02f, 0.0f);
         style.Colors[ImGuiCol_TitleBg] = ImVec4(0.08f, 0.08f, 0.08f, 0.80f);
         style.Colors[ImGuiCol_TitleBgActive] = ImVec4(0.15f, 0.15f, 0.15f, 0.90f);
         style.Colors[ImGuiCol_Border] = ImVec4(0.40f, 0.40f, 0.40f, 0.30f);
@@ -180,6 +180,35 @@ namespace Graphics {
             }
         )glsl";
 
+        const char* blurFragmentShaderSource = R"glsl(
+            #version 330 core
+            out vec4 FragColor;
+            in vec2 TexCoords;
+
+            uniform sampler2D image;
+            uniform bool horizontal; // Determine the blurring direction
+            // Gaussian weights (set from C++)
+            uniform float weight[5];
+
+            void main() {
+                vec2 tex_offset = 1.0 / textureSize(image, 0);
+                vec3 result = texture(image, TexCoords).rgb * weight[0]; 
+                
+                if(horizontal) {
+                    for(int i = 1; i < 5; ++i) {
+                        result += texture(image, TexCoords + vec2(tex_offset.x * i, 0.0)).rgb * weight[i];
+                        result += texture(image, TexCoords - vec2(tex_offset.x * i, 0.0)).rgb * weight[i];
+                    }
+                } else {
+                    for(int i = 1; i < 5; ++i) {
+                        result += texture(image, TexCoords + vec2(0.0, tex_offset.y * i)).rgb * weight[i];
+                        result += texture(image, TexCoords - vec2(0.0, tex_offset.y * i)).rgb * weight[i];
+                    }
+                }
+                FragColor = vec4(result, 1.0);
+            }
+        )glsl";
+
         // Compile Vertex Shader
         unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
         glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
@@ -220,6 +249,26 @@ namespace Graphics {
         // Delete temporary screen shader files
         glDeleteShader(screenVertexShader);
         glDeleteShader(screenFragmentShader);
+
+        // Compile Blur Vertex Shader (reuses the screen-space vertex shader)
+        unsigned int blurVertexShader = glCreateShader(GL_VERTEX_SHADER);
+        glShaderSource(blurVertexShader, 1, &screenVertexShaderSource, NULL);
+        glCompileShader(blurVertexShader);
+
+        // Compile Blur Fragment Shader
+        unsigned int blurFragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+        glShaderSource(blurFragmentShader, 1, &blurFragmentShaderSource, NULL);
+        glCompileShader(blurFragmentShader);
+
+        // Link blur shader program
+        blurShaderProgram = glCreateProgram();
+        glAttachShader(blurShaderProgram, blurVertexShader);
+        glAttachShader(blurShaderProgram, blurFragmentShader);
+        glLinkProgram(blurShaderProgram);
+
+        // Delete temporary blur shader files
+        glDeleteShader(blurVertexShader);
+        glDeleteShader(blurFragmentShader);
     }
 
     void Renderer::initSphere(int sectorCount, int stackCount) {
@@ -313,6 +362,7 @@ namespace Graphics {
         glDeleteBuffers(1, &VBO);
         glDeleteProgram(shaderProgram);
         glDeleteProgram(screenShaderProgram);
+        glDeleteProgram(blurShaderProgram);
 
         if (window) {
             glfwDestroyWindow(window);
@@ -390,6 +440,30 @@ namespace Graphics {
 
             // Draw command: Drawing 36 vertices from VBO (Forming a cube)
             glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, 0);
+        }
+
+        // Appy Gaussian Blur
+        bool horizontal = true, first_iteration = true;
+        unsigned int amount = 10;
+
+        glUseProgram(blurShaderProgram);
+        glUniform1i(glGetUniformLocation(blurShaderProgram, "image"), 0);
+        float weights[5] = { 0.227027f, 0.1945946f, 0.1216216f, 0.054054f, 0.016216f };
+        glUniform1fv(glGetUniformLocation(blurShaderProgram, "weight"), 5, weights);
+        for (unsigned int i = 0; i < amount; i++) {
+            glBindFramebuffer(GL_FRAMEBUFFER, pingpongFBO[horizontal]);
+            glUniform1i(glGetUniformLocation(blurShaderProgram, "horizontal"), horizontal);
+
+            // Get image from main FBO
+            glBindTexture(GL_TEXTURE_2D, first_iteration ? textureColorbuffer : pingpongColorbuffers[!horizontal]);
+
+            glBindVertexArray(quadVAO);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+
+            horizontal = !horizontal;
+            if (first_iteration) {
+                first_iteration = false;
+            }
         }
 
         // Paste the FBO image onto the screen and apply a filter
@@ -551,5 +625,19 @@ namespace Graphics {
         glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
         glEnableVertexAttribArray(1);
         glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+
+        // Init Ping Pong FBOs for Gaussian Blur
+        glGenFramebuffers(2, pingpongFBO);
+        glGenTextures(2, pingpongColorbuffers);
+        for (unsigned int i = 0; i < 2; i++) {
+            glBindFramebuffer(GL_FRAMEBUFFER, pingpongFBO[i]);
+            glBindTexture(GL_TEXTURE_2D, pingpongColorbuffers[i]);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pingpongColorbuffers[i], 0);
+        }
     }
 }

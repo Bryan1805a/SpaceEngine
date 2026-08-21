@@ -116,6 +116,34 @@ int main() {
         renderer.beginUI();
 
         ImGui::Begin("Space Engine Control Panel");
+        // Get the current coordinates and dimensions of the UI window
+        ImVec2 winPos = ImGui::GetWindowPos();
+        ImVec2 winSize = ImGui::GetWindowSize();
+        ImVec2 screenRes = ImVec2(1280.0f, 720.0f); // Display resolution
+
+        // UV Calculation
+        ImVec2 uv0 = ImVec2(winPos.x / screenRes.x, winPos.y / screenRes.y);
+        ImVec2 uv1 = ImVec2((winPos.x + winSize.x) / screenRes.x, (winPos.y + winSize.y) / screenRes.y);
+
+        // Invert Y-axis
+        uv0.y = 1.0f - uv0.y;
+        uv1.y = 1.0f - uv1.y;
+        std::swap(uv0.y, uv1.y);
+
+        // Apply blur glass effect
+        ImGui::GetWindowDrawList()->AddImage(
+            (void*)(intptr_t)renderer.getBlurredTexture(),
+            winPos,
+            ImVec2(winPos.x + winSize.x, winPos.y + winSize.y),
+            uv0, uv1
+        );
+
+        // Add an ultra-thin gray/black overlay (Alpha = 0.2) 
+        // over the frosted glass to make the text easier to read
+        ImGui::GetWindowDrawList()->AddRectFilled(
+            winPos, ImVec2(winPos.x + winSize.x, winPos.y + winSize.y),
+            IM_COL32(10, 10, 10, 50)
+        );
 
         ImGui::Text("Performance: %.1f FPS", ImGui::GetIO().Framerate);
         ImGui::Text("Active Entities: %zu", sim.getBodyCount());
