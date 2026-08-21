@@ -35,7 +35,8 @@ namespace Graphics {
 
             // Post-Processing and FBO
             unsigned int FBO;
-            unsigned int textureColorbuffer;
+            unsigned int textureColorbuffer; // Ordinary scenery
+            unsigned int textureBloombuffer; // Contains only the bloom area
             unsigned int RBO; // Renderbuffer for Depth
 
             unsigned int quadVAO, quadVBO;
@@ -43,9 +44,14 @@ namespace Graphics {
 
             void initFBO();
 
-            // Gaussian Blur
+            // Gaussian Blur for UI blur
             unsigned int pingpongFBO[2];
             unsigned int pingpongColorbuffers[2];
+
+            // Gaussian blur for bloom
+            unsigned int pingpongFBO_Bloom[2];
+            unsigned int pingpongColorbuffers_Bloom[2];
+
             unsigned int blurShaderProgram;
         public:
             Renderer(int w, int h, const char* title);
@@ -58,7 +64,7 @@ namespace Graphics {
             void swapBuffers() const;
             void pollEvents() const;
 
-            void draw(size_t count, const std::vector<Vector3>& positions, const std::vector<double>& masses) const;
+            void draw(size_t count, const std::vector<Vector3>& positions, const std::vector<double>& masses, const std::vector<glm::quat>& orientations) const;
             void processInput(float deltaTime); // Function to read keyboard and mouse input for movement
 
             void beginUI() const; // Start drawing the interface for the frame

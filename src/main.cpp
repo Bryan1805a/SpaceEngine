@@ -52,6 +52,7 @@ int main() {
 
     // Create 1000 asteroids
     int numPlanets = 1000;
+    std::uniform_real_distribution<float> distAngularSpeed(-2.0f, 2.0f); // Rotational speed (rad/s)
     for (int i = 0; i < numPlanets; ++i) {
        //  Random coordinates with disk shaped
        double r = distRadius(gen);
@@ -73,8 +74,11 @@ int main() {
 
        Vector3 vel = v_dir * v_mag;
 
+       // Random rotation axis
+       glm::vec3 spinAxis(distAngularSpeed(gen), distAngularSpeed(gen), distAngularSpeed(gen));
+
        // Add to the system
-       sim.addBody(distMass(gen), pos, vel);
+       sim.addBody(distMass(gen), pos, vel, spinAxis);
     }
 
     // Init graphics
@@ -110,7 +114,7 @@ int main() {
         renderer.clear();
 
         // Upload 1001 objects into GPU
-        renderer.draw(sim.getBodyCount(), sim.getPositions(), sim.getMasses());
+        renderer.draw(sim.getBodyCount(), sim.getPositions(), sim.getMasses(), sim.getOrientations());
 
         // Draw UI
         renderer.beginUI();

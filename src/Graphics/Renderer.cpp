@@ -96,12 +96,14 @@ namespace Graphics {
 
             out vec3 FragPos; // Passing world coordinates to the fragment shader
             out vec3 Normal; // Passing normal to the fragment shader
+            out vec3 LocalPos;
 
             uniform mat4 model;
             uniform mat4 view;
             uniform mat4 projection;
 
             void main() {
+                LocalPos = aPos;
                 FragPos = vec3(model * vec4(aPos, 1.0));
 
                 // Normal matrix
@@ -115,37 +117,44 @@ namespace Graphics {
         // Fragment Shader source code
         const char* fragmentShaderSource = R"glsl(
             #version 330 core
-            out vec4 FragColor;
+            layout (location = 0) out vec4 FragColor;       // Render Texture 1
+            layout (location = 1) out vec4 BrightColor;     // Render Texture 2
             
             in vec3 FragPos;
             in vec3 Normal;
-
+            in vec3 LocalPos; // Get origin coordinates
             uniform vec3 lightPos; 
             uniform float lightRadius; // Host star's rendered radius
 
             void main() {
-                // Ambient: Almost pitch-black, creating a sense of emptiness
                 float ambientStrength = 0.02; 
                 vec3 ambient = ambientStrength * vec3(1.0, 1.0, 1.0);
 
-                // Diffuse: Crisp white light
                 vec3 norm = normalize(Normal);
                 vec3 lightDir = normalize(lightPos - FragPos);
                 float diff = max(dot(norm, lightDir), 0.0);
-                vec3 diffuse = diff * vec3(0.9, 0.9, 0.9); 
+                vec3 diffuse = diff * vec3(0.9, 0.9, 0.9);
 
                 vec3 result;
-                // If it is the Host Star (very close to lightPos)
-                // Glows with a brilliant white light
                 if (length(lightPos - FragPos) < lightRadius) {
-                    result = vec3(1.0, 1.0, 1.0); 
-                } else {
-                    // Planets that are solely ash-gray (Base color: 0.3) absorb light
-                    vec3 planetBaseColor = vec3(0.3, 0.3, 0.3);
+                    result = vec3(3.0, 3.0, 3.0);
+                }
+                else {
+                    float stripe = sin(LocalPos.y * 20.0);
+                    vec3 planetBaseColor = vec3(0.3) + vec3(0.08) * stripe;
+
                     result = (ambient + diffuse) * planetBaseColor;
                 }
                 
+                // Output actual colors
                 FragColor = vec4(result, 1.0);
+
+                // Check: If brightness > 1.0, output it to BrightColor for the bloom effect
+                float brightness = dot(result, vec3(0.2126, 0.7152, 0.0722));
+                if(brightness > 1.0)
+                    BrightColor = vec4(result, 1.0);
+                else
+                    BrightColor = vec4(0.0, 0.0, 0.0, 1.0);
             }
         )glsl";
 
@@ -165,18 +174,30 @@ namespace Graphics {
             #version 330 core
             out vec4 FragColor;
             in vec2 TexCoords;
-            uniform sampler2D screenTexture;
+            
+            uniform sampler2D screenTexture; // Scene
+            uniform sampler2D bloomBlur;     // The light has been blurred
 
             void main() {
-                vec3 col = texture(screenTexture, TexCoords).rgb;
+                vec3 hdrColor = texture(screenTexture, TexCoords).rgb;      
+                vec3 bloomColor = texture(bloomBlur, TexCoords).rgb;
                 
-                // Vignette effect (Darkening the four corners)
+                // Additive Blending
+                hdrColor += bloomColor; 
+
+                // Tone Mapping
+                // Compressing HDR lighting back into the display's LDR color space
+                // The Exposure Tone Mapping algorithm creates a glare effect similar to that perceived by the human eye
+                float exposure = 1.0;
+                vec3 mapped = vec3(1.0) - exp(-hdrColor * exposure);
+
+                // Vignette effect
                 vec2 center = TexCoords - vec2(0.5);
                 float dist = length(center);
                 float vignette = smoothstep(0.8, 0.2, dist);
-                col *= vignette;
+                mapped *= vignette;
 
-                FragColor = vec4(col, 1.0);
+                FragColor = vec4(mapped, 1.0);
             }
         )glsl";
 
@@ -382,7 +403,7 @@ namespace Graphics {
         glfwSwapBuffers(window);
     }
 
-    void Renderer::draw(size_t count, const std::vector<Vector3>& positions, const std::vector<double>& masses) const {
+    void Renderer::draw(size_t count, const std::vector<Vector3>& positions, const std::vector<double>& masses, const std::vector<glm::quat>& orientations) const {
         // Render the 3D universe to a Frame Buffer Object (FBO)
         glBindFramebuffer(GL_FRAMEBUFFER, FBO);
         glEnable(GL_DEPTH_TEST);
@@ -421,19 +442,19 @@ namespace Graphics {
         }
 
         for (size_t i = 0; i < count; ++i) {
-            // Model matrix
-            // Start with identity matrix standing at Origin
-            glm::mat4 model = glm::mat4(1.0f);
-
-            // Move the cube based on the position calculated from physics
+            glm::mat4 model = glm::mat4(1.0f); 
             glm::vec3 pos((float)positions[i].x, (float)positions[i].y, (float)positions[i].z);
-            model = glm::translate(model, pos);
-
-
-            // Categorise volumes to scaling and colour-coding to improve visibility
-            // Size is proportional to mass (cube root)
             float radius = (float)std::cbrt(masses[i]);
-            model = glm::scale(model, glm::vec3(radius, radius, radius));
+
+            // Displacement Matrix
+            glm::mat4 translation = glm::translate(glm::mat4(1.0f), pos);
+            // Rotation Matrix (Convert from Quat to Mat4)
+            glm::mat4 rotation = glm::mat4_cast(orientations[i]);
+            // Elasticity Matrix
+            glm::mat4 scale = glm::scale(glm::mat4(1.0f), glm::vec3(radius));
+
+            // Assemble in the correct order: T * R * S
+            model = translation * rotation * scale;
 
             // Send this object's own model matrix to the GPU
             glUniformMatrix4fv(modeLoc, 1, GL_FALSE, glm::value_ptr(model));
@@ -446,6 +467,7 @@ namespace Graphics {
         bool horizontal = true, first_iteration = true;
         unsigned int amount = 10;
 
+        glActiveTexture(GL_TEXTURE0);
         glUseProgram(blurShaderProgram);
         glUniform1i(glGetUniformLocation(blurShaderProgram, "image"), 0);
         float weights[5] = { 0.227027f, 0.1945946f, 0.1216216f, 0.054054f, 0.016216f };
@@ -466,15 +488,45 @@ namespace Graphics {
             }
         }
 
+        // Apply Gaussian Blur for Bloom
+        bool horizontal_bloom = true;
+        bool first_iteration_bloom = true;
+        unsigned int amount_bloom = 15;
+
+        glUseProgram(blurShaderProgram);
+        for (unsigned int i = 0; i < amount_bloom; i++) {
+            glBindFramebuffer(GL_FRAMEBUFFER, pingpongFBO_Bloom[horizontal_bloom]);
+            glUniform1i(glGetUniformLocation(blurShaderProgram, "horizontal"), horizontal_bloom);
+
+            glBindTexture(GL_TEXTURE_2D, first_iteration_bloom ? textureBloombuffer : pingpongColorbuffers_Bloom[!horizontal_bloom]);
+
+            glBindVertexArray(quadVAO);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+
+            horizontal_bloom = !horizontal_bloom;
+            if (first_iteration_bloom) {
+                first_iteration_bloom = false;
+            }
+        }
+
         // Paste the FBO image onto the screen and apply a filter
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glDisable(GL_DEPTH_TEST);
         glClear(GL_COLOR_BUFFER_BIT);
 
         glUseProgram(screenShaderProgram);
-        glUniform1i(glGetUniformLocation(screenShaderProgram, "screenTexture"), 0);
-        glBindVertexArray(quadVAO);
+
+        // Assign the scenery texture to Slot 0
+        glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, textureColorbuffer);
+        glUniform1i(glGetUniformLocation(screenShaderProgram, "screenTexture"), 0);
+
+        // Attach the blurred bloom texture to Slot 1
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, pingpongColorbuffers_Bloom[!horizontal_bloom]);
+        glUniform1i(glGetUniformLocation(screenShaderProgram, "bloomBlur"), 1);
+        
+        glBindVertexArray(quadVAO);
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
         // Unbind VAO after drawing is complete
@@ -591,11 +643,22 @@ namespace Graphics {
         // Create a texture to store the colors of the universe
         glGenTextures(1, &textureColorbuffer);
         glBindTexture(GL_TEXTURE_2D, textureColorbuffer);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, NULL);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         // Assign Texture to FBO
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureColorbuffer, 0);
+
+        // Bloom effect
+        glGenTextures(1, &textureBloombuffer);
+        glBindTexture(GL_TEXTURE_2D, textureBloombuffer);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, textureBloombuffer, 0);
+
+        unsigned int attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+        glDrawBuffers(2, attachments);
 
         // Create RBP to processing Depth
         glGenRenderbuffers(1, &RBO);
@@ -638,6 +701,20 @@ namespace Graphics {
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
             glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pingpongColorbuffers[i], 0);
+        }
+
+        // Init Ping-Pong FBOs for bloom
+        glGenFramebuffers(2, pingpongFBO_Bloom);
+        glGenTextures(2, pingpongColorbuffers_Bloom);
+        for (unsigned int i = 0; i < 2; i++) {
+            glBindFramebuffer(GL_FRAMEBUFFER, pingpongFBO_Bloom[i]);
+            glBindTexture(GL_TEXTURE_2D, pingpongColorbuffers_Bloom[i]);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGB, GL_FLOAT, NULL);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pingpongColorbuffers_Bloom[i], 0);
         }
     }
 }
