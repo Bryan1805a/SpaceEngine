@@ -117,42 +117,116 @@ namespace Graphics {
         // Fragment Shader source code
         const char* fragmentShaderSource = R"glsl(
             #version 330 core
-            layout (location = 0) out vec4 FragColor;       // Render Texture 1
-            layout (location = 1) out vec4 BrightColor;     // Render Texture 2
+            layout (location = 0) out vec4 FragColor;       
+            layout (location = 1) out vec4 BrightColor;     
             
             in vec3 FragPos;
             in vec3 Normal;
-            in vec3 LocalPos; // Get origin coordinates
+            in vec3 LocalPos; // Use LocalPos so the surface pattern rotates with the planet
+
             uniform vec3 lightPos; 
-            uniform float lightRadius; // Host star's rendered radius
+            uniform vec3 viewPos; // Camera position for calculating the atmospheric viewing angle
+            
+            uniform int bodyType;
+            uniform float temperature;
+
+            // 3D Noise
+            float hash(vec3 p) {
+                p = fract(p * 0.3183099 + 0.1);
+                p *= 17.0;
+                return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+            }
+            float noise(vec3 x) {
+                vec3 i = floor(x);
+                vec3 f = fract(x);
+                f = f * f * (3.0 - 2.0 * f);
+                return mix(mix(mix(hash(i + vec3(0,0,0)), hash(i + vec3(1,0,0)), f.x),
+                               mix(hash(i + vec3(0,1,0)), hash(i + vec3(1,1,0)), f.x), f.y),
+                           mix(mix(hash(i + vec3(0,0,1)), hash(i + vec3(1,0,1)), f.x),
+                               mix(hash(i + vec3(0,1,1)), hash(i + vec3(1,1,1)), f.x), f.y), f.z);
+            }
+            // Fractal Brownian Motion (Create undulating terrain)
+            float fbm(vec3 x) {
+                float v = 0.0; float a = 0.5; vec3 shift = vec3(100.0);
+                for (int i = 0; i < 4; ++i) {
+                    v += a * noise(x);
+                    x = x * 2.0 + shift;
+                    a *= 0.5;
+                }
+                return v;
+            }
 
             void main() {
-                float ambientStrength = 0.02; 
-                vec3 ambient = ambientStrength * vec3(1.0, 1.0, 1.0);
-
                 vec3 norm = normalize(Normal);
+                vec3 viewDir = normalize(viewPos - FragPos);
                 vec3 lightDir = normalize(lightPos - FragPos);
-                float diff = max(dot(norm, lightDir), 0.0);
-                vec3 diffuse = diff * vec3(0.9, 0.9, 0.9);
-
-                vec3 result;
-                if (length(lightPos - FragPos) < lightRadius) {
-                    result = vec3(3.0, 3.0, 3.0);
-                }
-                else {
-                    float stripe = sin(LocalPos.y * 20.0);
-                    vec3 planetBaseColor = vec3(0.3) + vec3(0.08) * stripe;
-
-                    result = (ambient + diffuse) * planetBaseColor;
-                }
                 
-                // Output actual colors
-                FragColor = vec4(result, 1.0);
+                float diff = max(dot(norm, lightDir), 0.0);
+                vec3 ambient = vec3(0.01); 
+                
+                vec3 resultColor = vec3(0.0);
+                vec3 emissionGlow = vec3(0.0); // Store self-illumination (like lava)
 
-                // Check: If brightness > 1.0, output it to BrightColor for the bloom effect
-                float brightness = dot(result, vec3(0.2126, 0.7152, 0.0722));
-                if(brightness > 1.0)
-                    BrightColor = vec4(result, 1.0);
+                // SUN
+                if (bodyType == 0) { 
+                    resultColor = vec3(3.0, 2.8, 2.5); // Warm white (HDR)
+                    emissionGlow = resultColor;
+                } 
+                // ROCKY PLANETS (Temperature Interaction)
+                else if (bodyType == 1) { 
+                    float elevation = fbm(LocalPos * 5.0); // Generate continental elevation
+                    
+                    if (temperature > 800.0) {
+                        // Scenario A: Lava Continent 
+                        // Caused by drifting close to the Sun
+                        vec3 crust = vec3(0.1, 0.05, 0.05); // Volcanic rock
+                        vec3 lava = vec3(3.0, 0.8, 0.0);    // Blazing lava
+                        float lavaMask = smoothstep(0.4, 0.6, elevation);
+                        resultColor = mix(lava, crust, lavaMask) * (ambient + diff);
+                        
+                        if (lavaMask < 0.5) emissionGlow = lava * (1.0 - lavaMask);
+                    } 
+                    else if (temperature > 250.0 && temperature < 350.0) {
+                        // Scenario B: Earth (With life)
+                        vec3 water = vec3(0.02, 0.15, 0.4);
+                        vec3 land = mix(vec3(0.1, 0.4, 0.1), vec3(0.5, 0.4, 0.2), fbm(LocalPos * 10.0));
+                        
+                        // Two freezing poles based on the Y-axis and temperature
+                        float poleMask = smoothstep(0.6, 0.9, abs(LocalPos.y)) * smoothstep(350.0, 250.0, temperature);
+                        vec3 ice = vec3(0.9, 0.9, 1.0);
+                        
+                        vec3 baseCol = (elevation < 0.5) ? water : land;
+                        baseCol = mix(baseCol, ice, poleMask); // Snow-capped peaks
+                        
+                        resultColor = baseCol * (ambient + diff);
+                        
+                        // Atmospheric Scattering (Fresnel Effect)
+                        // Create a blue halo only at the planet's edge and on the illuminated side
+                        float fresnel = pow(1.0 - max(dot(norm, viewDir), 0.0), 3.0);
+                        vec3 atmosphere = vec3(0.2, 0.5, 1.0) * fresnel * diff; 
+                        resultColor += atmosphere;
+                    } 
+                    else {
+                        // Scenario C: Frozen Planet / Deadly (Mars / Pluto)
+                        vec3 barren = mix(vec3(0.5, 0.3, 0.2), vec3(0.8, 0.9, 1.0), smoothstep(0.0, 150.0, 250.0 - temperature));
+                        resultColor = barren * elevation * (ambient + diff);
+                    }
+                } 
+                // 3. GAS PLANET (Jupiter)
+                else if (bodyType == 2) { 
+                    // Sọc mây vắt ngang trục Y
+                    float bands = fbm(vec3(LocalPos.y * 15.0, LocalPos.x, LocalPos.z));
+                    vec3 gas1 = vec3(0.7, 0.6, 0.5);
+                    vec3 gas2 = vec3(0.5, 0.3, 0.1);
+                    resultColor = mix(gas1, gas2, bands) * (ambient + diff);
+                }
+
+                FragColor = vec4(resultColor, 1.0);
+
+                // If the overall brightness or lava intensity is high enough, switch to Texture Bloom
+                float brightness = dot(FragColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+                if(brightness > 1.0 || length(emissionGlow) > 0.0)
+                    BrightColor = vec4(max(FragColor.rgb, emissionGlow), 1.0);
                 else
                     BrightColor = vec4(0.0, 0.0, 0.0, 1.0);
             }
@@ -403,7 +477,7 @@ namespace Graphics {
         glfwSwapBuffers(window);
     }
 
-    void Renderer::draw(size_t count, const std::vector<Vector3>& positions, const std::vector<double>& radii, const std::vector<glm::quat>& orientations) const {
+    void Renderer::draw(size_t count, const std::vector<Vector3>& positions, const std::vector<double>& radii, const std::vector<glm::quat>& orientations, const std::vector<Simulation::BodyType>& types, const std::vector<double>& temperatures) const {
         // Render the 3D universe to a Frame Buffer Object (FBO)
         glBindFramebuffer(GL_FRAMEBUFFER, FBO);
         glEnable(GL_DEPTH_TEST);
@@ -428,22 +502,30 @@ namespace Graphics {
         int viewLoc = glGetUniformLocation(shaderProgram, "view");
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
 
+        // Send camera position to the atmospheric (Fresnel) shader
+        int viewPosLoc = glGetUniformLocation(shaderProgram, "viewPos");
+        glUniform3f(viewPosLoc, cameraPos.x, cameraPos.y, cameraPos.z);
+
+        // // Send light source position (Fixed at the Star - position 0)
+        int lightPosLoc = glGetUniformLocation(shaderProgram, "lightPos");
+        if (count > 0) {
+            glUniform3f(lightPosLoc, (float)positions[0].x, (float)positions[0].y, (float)positions[0].z);
+        }
+
+        int typeLoc = glGetUniformLocation(shaderProgram, "bodyType");
+        int tempLoc = glGetUniformLocation(shaderProgram, "temperature");
+
         // Drawing objects
         // Bind the VAO again to let the GPU know we are about to use the cube's vertex data
         glBindVertexArray(VAO);
 
         int modeLoc = glGetUniformLocation(shaderProgram, "model");
-        int lightPosLoc = glGetUniformLocation(shaderProgram, "lightPos");
-        int lightRadiusLoc = glGetUniformLocation(shaderProgram, "lightRadius");
-        if (count > 0) {
-            glUniform3f(lightPosLoc, (float)positions[0].x, (float)positions[0].y, (float)positions[0].z);
-            // Host star's rendered radius
-            glUniform1f(lightRadiusLoc, (float)radii[0]);
-        }
 
         for (size_t i = 0; i < count; ++i) {
             glm::mat4 model = glm::mat4(1.0f); 
             glm::vec3 pos((float)positions[i].x, (float)positions[i].y, (float)positions[i].z);
+
+            // Visual scale (explicit radius in AU)
             float radius = (float)radii[i];
 
             // Displacement Matrix
@@ -455,6 +537,10 @@ namespace Graphics {
 
             // Assemble in the correct order: T * R * S
             model = translation * rotation * scale;
+
+            // Send the object types and temperature to the GPU
+            glUniform1i(typeLoc, static_cast<int>(types[i]));
+            glUniform1f(tempLoc, (float)temperatures[i]);
 
             // Send this object's own model matrix to the GPU
             glUniformMatrix4fv(modeLoc, 1, GL_FALSE, glm::value_ptr(model));

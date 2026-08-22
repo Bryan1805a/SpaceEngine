@@ -4,6 +4,8 @@
 #include <glm/glm.hpp>
 #include <vector>
 #include <Math/Vector3.hpp>
+#include <Simulation/Simulation.hpp>
+
 namespace Graphics {
     class Renderer {
         private:
@@ -64,7 +66,13 @@ namespace Graphics {
             void swapBuffers() const;
             void pollEvents() const;
 
-            void draw(size_t count, const std::vector<Vector3>& positions, const std::vector<double>& radii, const std::vector<glm::quat>& orientations) const;
+            void draw(size_t count,
+                      const std::vector<Vector3>& positions,
+                      const std::vector<double>& radii,
+                      const std::vector<glm::quat>& orientations,
+                      const std::vector<Simulation::BodyType>& types,
+                      const std::vector<double>& temperatures) const;
+                      
             void processInput(float deltaTime); // Function to read keyboard and mouse input for movement
 
             void beginUI() const; // Start drawing the interface for the frame

@@ -114,7 +114,8 @@ int main() {
         renderer.clear();
 
         // Upload objects into GPU
-        renderer.draw(sim.getBodyCount(), sim.getPositions(), sim.getRadii(), sim.getOrientations());
+        renderer.draw(sim.getBodyCount(), sim.getPositions(), sim.getRadii(),
+                      sim.getOrientations(), sim.getTypes(), sim.getTemperatures());
 
         // Draw UI
         renderer.beginUI();
