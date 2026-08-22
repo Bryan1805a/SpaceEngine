@@ -1,4 +1,7 @@
 #include <iostream>
+#include <fstream>
+#include <sstream>
+#include <string>
 #include <cmath>
 #include <vector>
 #include <Graphics/Renderer.hpp>
@@ -93,390 +96,12 @@ namespace Graphics {
     }
 
     void Renderer::initShaders() {
-        // Vertex shader code
-        const char* vertexShaderSource = R"glsl(
-            #version 330 core
-            layout (location = 0) in vec3 aPos;
-            layout (location = 1) in vec3 aNormal;
-
-            out vec3 FragPos; // Passing world coordinates to the fragment shader
-            out vec3 Normal; // Passing normal to the fragment shader
-            out vec3 LocalPos;
-
-            uniform mat4 model;
-            uniform mat4 view;
-            uniform mat4 projection;
-
-            void main() {
-                LocalPos = aPos;
-                FragPos = vec3(model * vec4(aPos, 1.0));
-
-                // Normal matrix
-                // Avoid distortion when scaling
-                Normal = mat3(transpose(inverse(model))) * aNormal;
-
-                gl_Position = projection * view * vec4(FragPos, 1.0);
-            }
-        )glsl";
-
-        // Fragment Shader source code
-        const char* fragmentShaderSource = R"glsl(
-            #version 330 core
-            layout (location = 0) out vec4 FragColor;       
-            layout (location = 1) out vec4 BrightColor;     
-            
-            in vec3 FragPos;
-            in vec3 Normal;
-            in vec3 LocalPos; // Use LocalPos so the surface pattern rotates with the planet
-
-            uniform vec3 lightPos; 
-            uniform vec3 viewPos; // Camera position for calculating the atmospheric viewing angle
-            
-            uniform int bodyType;
-            uniform float temperature;
-
-            // 3D Noise
-            float hash(vec3 p) {
-                p = fract(p * 0.3183099 + 0.1);
-                p *= 17.0;
-                return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
-            }
-            float noise(vec3 x) {
-                vec3 i = floor(x);
-                vec3 f = fract(x);
-                f = f * f * (3.0 - 2.0 * f);
-                return mix(mix(mix(hash(i + vec3(0,0,0)), hash(i + vec3(1,0,0)), f.x),
-                               mix(hash(i + vec3(0,1,0)), hash(i + vec3(1,1,0)), f.x), f.y),
-                           mix(mix(hash(i + vec3(0,0,1)), hash(i + vec3(1,0,1)), f.x),
-                               mix(hash(i + vec3(0,1,1)), hash(i + vec3(1,1,1)), f.x), f.y), f.z);
-            }
-            // Fractal Brownian Motion (Create undulating terrain)
-            float fbm(vec3 x) {
-                float v = 0.0; float a = 0.5; vec3 shift = vec3(100.0);
-                for (int i = 0; i < 4; ++i) {
-                    v += a * noise(x);
-                    x = x * 2.0 + shift;
-                    a *= 0.5;
-                }
-                return v;
-            }
-
-            void main() {
-                vec3 norm = normalize(Normal);
-                vec3 viewDir = normalize(viewPos - FragPos);
-                vec3 lightDir = normalize(lightPos - FragPos);
-                
-                float diff = max(dot(norm, lightDir), 0.0);
-                vec3 ambient = vec3(0.01); 
-                
-                vec3 resultColor = vec3(0.0);
-                vec3 emissionGlow = vec3(0.0); // Store self-illumination (like lava)
-
-                // SUN
-                if (bodyType == 0) { 
-                    resultColor = vec3(3.0, 2.8, 2.5); // Warm white (HDR)
-                    emissionGlow = resultColor;
-                } 
-                // ROCKY PLANETS (Temperature Interaction)
-                else if (bodyType == 1) { 
-                    float elevation = fbm(LocalPos * 5.0); // Generate continental elevation
-                    
-                    if (temperature > 800.0) {
-                        // Scenario A: Lava Continent 
-                        // Caused by drifting close to the Sun
-                        vec3 crust = vec3(0.1, 0.05, 0.05); // Volcanic rock
-                        vec3 lava = vec3(3.0, 0.8, 0.0);    // Blazing lava
-                        float lavaMask = smoothstep(0.4, 0.6, elevation);
-                        resultColor = mix(lava, crust, lavaMask) * (ambient + diff);
-                        
-                        if (lavaMask < 0.5) emissionGlow = lava * (1.0 - lavaMask);
-                    } 
-                    else if (temperature > 250.0 && temperature < 350.0) {
-                        // Scenario B: Earth (With life)
-                        vec3 water = vec3(0.02, 0.15, 0.4);
-                        vec3 land = mix(vec3(0.1, 0.4, 0.1), vec3(0.5, 0.4, 0.2), fbm(LocalPos * 10.0));
-                        
-                        // Two freezing poles based on the Y-axis and temperature
-                        float poleMask = smoothstep(0.6, 0.9, abs(LocalPos.y)) * smoothstep(350.0, 250.0, temperature);
-                        vec3 ice = vec3(0.9, 0.9, 1.0);
-                        
-                        vec3 baseCol = (elevation < 0.5) ? water : land;
-                        baseCol = mix(baseCol, ice, poleMask); // Snow-capped peaks
-                        
-                        resultColor = baseCol * (ambient + diff);
-                        
-                        // Atmospheric Scattering (Fresnel Effect)
-                        // Create a blue halo only at the planet's edge and on the illuminated side
-                        float fresnel = pow(1.0 - max(dot(norm, viewDir), 0.0), 3.0);
-                        vec3 atmosphere = vec3(0.2, 0.5, 1.0) * fresnel * diff; 
-                        resultColor += atmosphere;
-                    } 
-                    else {
-                        // Scenario C: Frozen Planet / Deadly (Mars / Pluto)
-                        vec3 barren = mix(vec3(0.5, 0.3, 0.2), vec3(0.8, 0.9, 1.0), smoothstep(0.0, 150.0, 250.0 - temperature));
-                        resultColor = barren * elevation * (ambient + diff);
-                    }
-                } 
-                // 3. GAS PLANET (Jupiter)
-                else if (bodyType == 2) { 
-                    // Cloud bands running across the Y axis
-                    float bands = fbm(vec3(LocalPos.y * 15.0, LocalPos.x, LocalPos.z));
-                    vec3 gas1 = vec3(0.7, 0.6, 0.5);
-                    vec3 gas2 = vec3(0.5, 0.3, 0.1);
-                    resultColor = mix(gas1, gas2, bands) * (ambient + diff);
-                }
-                // 4. ICE MOON
-                else if (bodyType == 3) {
-                    float craters = fbm(LocalPos * 6.0);
-                    vec3 ice = mix(vec3(0.5, 0.6, 0.7), vec3(0.9, 0.95, 1.0), craters);
-                    resultColor = ice * (ambient + diff);
-                }
-                // 5. ASTEROID
-                else if (bodyType == 4) {
-                    float rough = fbm(LocalPos * 8.0);
-                    vec3 rock = mix(vec3(0.2, 0.18, 0.15), vec3(0.45, 0.42, 0.38), rough);
-                    resultColor = rock * (ambient + diff);
-                }
-
-                FragColor = vec4(resultColor, 1.0);
-
-                // If the overall brightness or lava intensity is high enough, switch to Texture Bloom
-                float brightness = dot(FragColor.rgb, vec3(0.2126, 0.7152, 0.0722));
-                if(brightness > 1.0 || length(emissionGlow) > 0.0)
-                    BrightColor = vec4(max(FragColor.rgb, emissionGlow), 1.0);
-                else
-                    BrightColor = vec4(0.0, 0.0, 0.0, 1.0);
-            }
-        )glsl";
-
-        // SCREEN SHADER (POST-PROCESSING)
-        const char* screenVertexShaderSource = R"glsl(
-            #version 330 core
-            layout (location = 0) in vec2 aPos;
-            layout (location = 1) in vec2 aTexCoords;
-            out vec2 TexCoords;
-            void main() {
-                TexCoords = aTexCoords;
-                gl_Position = vec4(aPos.x, aPos.y, 0.0, 1.0);
-            }
-        )glsl";
-
-        const char* screenFragmentShaderSource = R"glsl(
-            #version 330 core
-            out vec4 FragColor;
-            in vec2 TexCoords;
-            
-            uniform sampler2D screenTexture; // Scene
-            uniform sampler2D bloomBlur;     // The light has been blurred
-
-            void main() {
-                vec3 hdrColor = texture(screenTexture, TexCoords).rgb;      
-                vec3 bloomColor = texture(bloomBlur, TexCoords).rgb;
-                
-                // Additive Blending
-                hdrColor += bloomColor; 
-
-                // Tone Mapping
-                // Compressing HDR lighting back into the display's LDR color space
-                // The Exposure Tone Mapping algorithm creates a glare effect similar to that perceived by the human eye
-                float exposure = 1.0;
-                vec3 mapped = vec3(1.0) - exp(-hdrColor * exposure);
-
-                // Vignette effect
-                vec2 center = TexCoords - vec2(0.5);
-                float dist = length(center);
-                float vignette = smoothstep(0.8, 0.2, dist);
-                mapped *= vignette;
-
-                FragColor = vec4(mapped, 1.0);
-            }
-        )glsl";
-
-        const char* blurFragmentShaderSource = R"glsl(
-            #version 330 core
-            out vec4 FragColor;
-            in vec2 TexCoords;
-
-            uniform sampler2D image;
-            uniform bool horizontal; // Determine the blurring direction
-            // Gaussian weights (set from C++)
-            uniform float weight[5];
-
-            void main() {
-                vec2 tex_offset = 1.0 / textureSize(image, 0);
-                vec3 result = texture(image, TexCoords).rgb * weight[0]; 
-                
-                if(horizontal) {
-                    for(int i = 1; i < 5; ++i) {
-                        result += texture(image, TexCoords + vec2(tex_offset.x * i, 0.0)).rgb * weight[i];
-                        result += texture(image, TexCoords - vec2(tex_offset.x * i, 0.0)).rgb * weight[i];
-                    }
-                } else {
-                    for(int i = 1; i < 5; ++i) {
-                        result += texture(image, TexCoords + vec2(0.0, tex_offset.y * i)).rgb * weight[i];
-                        result += texture(image, TexCoords - vec2(0.0, tex_offset.y * i)).rgb * weight[i];
-                    }
-                }
-                FragColor = vec4(result, 1.0);
-            }
-        )glsl";
-
-        const char* skyboxVertexShaderSource = R"glsl(
-            #version 330 core
-            layout (location = 0) in vec2 aPos;
-            
-            out vec3 viewRay; // Tia nhìn từ Camera
-            
-            uniform mat4 invProjection;
-            uniform mat4 invView;
-
-            void main() {
-                // Ép Z = 0.9999 để nó luôn nằm ở vô cực (xa nhất có thể)
-                vec4 clipPos = vec4(aPos, 0.9999, 1.0);
-                
-                // Dùng ma trận nghịch đảo để lùi từ Màn hình 2D về Không gian 3D
-                vec4 viewPos = invProjection * clipPos;
-                viewRay = (invView * vec4(viewPos.xyz, 0.0)).xyz; // Lấy hướng tia nhìn
-                
-                gl_Position = clipPos;
-            }
-        )glsl";
-
-        const char* skyboxFragmentShaderSource = R"glsl(
-            #version 330 core
-            layout (location = 0) out vec4 FragColor;       
-            layout (location = 1) out vec4 BrightColor; // Vẫn phải xuất ra 2 kênh vì FBO yêu cầu
-            
-            in vec3 viewRay;
-
-            // Hàm băm (Hash) để tạo các vì sao sắc nét ngẫu nhiên
-            float hash(vec3 p) {
-                p = fract(p * 0.3183099 + 0.1);
-                p *= 17.0;
-                return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
-            }
-
-            // Hàm nhiễu 3D và FBM để làm tinh vân lờ mờ (Bỏ bớt chi tiết cho nhẹ GPU)
-            float noise(vec3 x) {
-                vec3 i = floor(x); vec3 f = fract(x);
-                f = f * f * (3.0 - 2.0 * f);
-                return mix(mix(mix(hash(i), hash(i + vec3(1,0,0)), f.x),
-                               mix(hash(i + vec3(0,1,0)), hash(i + vec3(1,1,0)), f.x), f.y),
-                           mix(mix(hash(i + vec3(0,0,1)), hash(i + vec3(1,0,1)), f.x),
-                               mix(hash(i + vec3(0,1,1)), hash(i + vec3(1,1,1)), f.x), f.y), f.z);
-            }
-            float fbm(vec3 x) {
-                float v = 0.0; float a = 0.5; vec3 shift = vec3(100.0);
-                for (int i = 0; i < 3; ++i) { v += a * noise(x); x = x * 2.0 + shift; a *= 0.5; }
-                return v;
-            }
-
-            void main() {
-                vec3 dir = normalize(viewRay);
-
-                // 1. SINH CÁC VÌ SAO LI TI (STARS)
-                // Phóng to không gian lên 500 lần để tạo hạt nhỏ. Nếu hash > 0.995 thì thành sao, ngược lại là đen.
-                float starVal = hash(dir * 500.0);
-                float star = smoothstep(0.995, 1.0, starVal); 
-                
-                // Làm một số ngôi sao sáng lấp lánh ngẫu nhiên
-                star *= (0.3 + 0.7 * sin(dir.x * 123.0 + dir.y * 321.0));
-
-                // 2. TẠO TINH VÂN KHÔNG GIAN SÂU (DEEP SPACE DUST)
-                float dust = fbm(dir * 4.0);
-                float dustMask = smoothstep(0.4, 0.8, dust);
-                // Tinh vân mang màu xám/đen cực tối, đúng chất kinh dị viễn tưởng
-                vec3 dustColor = vec3(0.04, 0.04, 0.04) * dustMask; 
-
-                // Kết hợp lại
-                vec3 finalColor = vec3(star) + dustColor;
-
-                FragColor = vec4(finalColor, 1.0);
-                // Không đẩy ánh sáng sao vào kênh Bloom để giữ vẻ tĩnh mịch sắc lạnh
-                BrightColor = vec4(0.0, 0.0, 0.0, 1.0); 
-            }
-        )glsl";
-
-        // Compile Vertex Shader
-        unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
-        glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
-        glCompileShader(vertexShader);
-        // Error check will be add later
-
-        // Compile Fragment Shader
-        unsigned int fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-        glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
-        glCompileShader(fragmentShader);
-
-        // Link
-        shaderProgram = glCreateProgram();
-        glAttachShader(shaderProgram, vertexShader);
-        glAttachShader(shaderProgram, fragmentShader);
-        glLinkProgram(shaderProgram);
-
-        // Delete temporary shader files
-        glDeleteShader(vertexShader);
-        glDeleteShader(fragmentShader);
-
-        // Compile Screen Vertex Shader
-        unsigned int screenVertexShader = glCreateShader(GL_VERTEX_SHADER);
-        glShaderSource(screenVertexShader, 1, &screenVertexShaderSource, NULL);
-        glCompileShader(screenVertexShader);
-
-        // Compile Screen Fragment Shader
-        unsigned int screenFragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-        glShaderSource(screenFragmentShader, 1, &screenFragmentShaderSource, NULL);
-        glCompileShader(screenFragmentShader);
-
-        // Link screen shader program
-        screenShaderProgram = glCreateProgram();
-        glAttachShader(screenShaderProgram, screenVertexShader);
-        glAttachShader(screenShaderProgram, screenFragmentShader);
-        glLinkProgram(screenShaderProgram);
-
-        // Delete temporary screen shader files
-        glDeleteShader(screenVertexShader);
-        glDeleteShader(screenFragmentShader);
-
-        // Compile Blur Vertex Shader (reuses the screen-space vertex shader)
-        unsigned int blurVertexShader = glCreateShader(GL_VERTEX_SHADER);
-        glShaderSource(blurVertexShader, 1, &screenVertexShaderSource, NULL);
-        glCompileShader(blurVertexShader);
-
-        // Compile Blur Fragment Shader
-        unsigned int blurFragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-        glShaderSource(blurFragmentShader, 1, &blurFragmentShaderSource, NULL);
-        glCompileShader(blurFragmentShader);
-
-        // Link blur shader program
-        blurShaderProgram = glCreateProgram();
-        glAttachShader(blurShaderProgram, blurVertexShader);
-        glAttachShader(blurShaderProgram, blurFragmentShader);
-        glLinkProgram(blurShaderProgram);
-
-        // Delete temporary blur shader files
-        glDeleteShader(blurVertexShader);
-        glDeleteShader(blurFragmentShader);
-
-        // Compile Skybox Vertex Shader
-        unsigned int skyboxVertexShader = glCreateShader(GL_VERTEX_SHADER);
-        glShaderSource(skyboxVertexShader, 1, &skyboxVertexShaderSource, NULL);
-        glCompileShader(skyboxVertexShader);
-
-        // Compile Skybox Fragment Shader
-        unsigned int skyboxFragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-        glShaderSource(skyboxFragmentShader, 1, &skyboxFragmentShaderSource, NULL);
-        glCompileShader(skyboxFragmentShader);
-
-        // Link skybox shader program
-        skyboxShaderProgram = glCreateProgram();
-        glAttachShader(skyboxShaderProgram, skyboxVertexShader);
-        glAttachShader(skyboxShaderProgram, skyboxFragmentShader);
-        glLinkProgram(skyboxShaderProgram);
-
-        // Delete temporary skybox shader files
-        glDeleteShader(skyboxVertexShader);
-        glDeleteShader(skyboxFragmentShader);
+        // Load, compile and link each shader program from its source files
+        shaderProgram = loadShaderFromFile("assets/shaders/planet.vert", "assets/shaders/planet.frag");
+        screenShaderProgram = loadShaderFromFile("assets/shaders/screen.vert", "assets/shaders/screen.frag");
+        blurShaderProgram = loadShaderFromFile("assets/shaders/screen.vert", "assets/shaders/blur.frag");
+        skyboxShaderProgram = loadShaderFromFile("assets/shaders/skybox.vert", "assets/shaders/skybox.frag");
+        shadowShaderProgram = loadShaderFromFile("assets/shaders/shadow.vert", "assets/shaders/shadow.frag", "assets/shaders/shadow.geom");
     }
 
     void Renderer::initSphere(int sectorCount, int stackCount) {
@@ -591,6 +216,51 @@ namespace Graphics {
     }
 
     void Renderer::draw(size_t count, const std::vector<Vector3>& positions, const std::vector<double>& radii, const std::vector<glm::quat>& orientations, const std::vector<Simulation::BodyType>& types, const std::vector<double>& temperatures) const {
+        // Calculate 6 matrices from the Sun's perspective (90-degree field of view)
+        float near_plane = 1.0f;
+        float far_plane = 250.0f;
+        glm::mat4 shadowProj = glm::perspective(glm::radians(90.0f), 1.0f, near_plane, far_plane);
+
+        glm::vec3 lightPos(0.0f);
+        if (count > 0) {
+            lightPos = glm::vec3((float)positions[0].x, (float)positions[0].y, (float)positions[0].z);
+        }
+
+        std::vector<glm::mat4> shadowTransforms;
+        shadowTransforms.push_back(shadowProj * glm::lookAt(lightPos, lightPos + glm::vec3( 1.0, 0.0, 0.0), glm::vec3(0.0,-1.0, 0.0)));
+        shadowTransforms.push_back(shadowProj * glm::lookAt(lightPos, lightPos + glm::vec3(-1.0, 0.0, 0.0), glm::vec3(0.0,-1.0, 0.0)));
+        shadowTransforms.push_back(shadowProj * glm::lookAt(lightPos, lightPos + glm::vec3( 0.0, 1.0, 0.0), glm::vec3(0.0, 0.0, 1.0)));
+        shadowTransforms.push_back(shadowProj * glm::lookAt(lightPos, lightPos + glm::vec3( 0.0,-1.0, 0.0), glm::vec3(0.0, 0.0,-1.0)));
+        shadowTransforms.push_back(shadowProj * glm::lookAt(lightPos, lightPos + glm::vec3( 0.0, 0.0, 1.0), glm::vec3(0.0,-1.0, 0.0)));
+        shadowTransforms.push_back(shadowProj * glm::lookAt(lightPos, lightPos + glm::vec3( 0.0, 0.0,-1.0), glm::vec3(0.0,-1.0, 0.0)));
+
+        // SHADOW MAP
+        glViewport(0, 0, SHADOW_RES, SHADOW_RES);
+        glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+        glClear(GL_DEPTH_BUFFER_BIT);
+        glUseProgram(shadowShaderProgram);
+        glBindVertexArray(VAO);
+
+        for (unsigned int i = 0; i < 6; ++i) {
+            glUniformMatrix4fv(glGetUniformLocation(shadowShaderProgram, ("shadowMatrices[" + std::to_string(i) + "]").c_str()), 1, GL_FALSE, glm::value_ptr(shadowTransforms[i]));
+        }
+
+        glUniform1f(glGetUniformLocation(shadowShaderProgram, "far_plane"), far_plane);
+        glUniform3f(glGetUniformLocation(shadowShaderProgram, "lightPos"), lightPos.x, lightPos.y, lightPos.z);
+
+        // Drawing loop
+        for (size_t i = 1; i < count; ++i) { // Exclude the Sun (i=0) because the Sun does not cast a shadow on itself
+            glm::mat4 model = glm::mat4(1.0f);
+            glm::vec3 pos((float)positions[i].x, (float)positions[i].y, (float)positions[i].z);
+            float radius = (float)radii[i];
+            model = glm::translate(glm::mat4(1.0f), pos) * glm::mat4_cast(orientations[i]) * glm::scale(glm::mat4(1.0f), glm::vec3(radius));
+
+            glUniformMatrix4fv(glGetUniformLocation(shadowShaderProgram, "model"), 1, GL_FALSE, glm::value_ptr(model));
+            glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, 0);
+        }
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glViewport(0, 0, width, height);
+        
         // Render the 3D universe to a Frame Buffer Object (FBO)
         glBindFramebuffer(GL_FRAMEBUFFER, FBO);
         glEnable(GL_DEPTH_TEST);
@@ -599,6 +269,10 @@ namespace Graphics {
         
         // Activate Shader Program
         glUseProgram(shaderProgram);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, depthCubemap);
+        glUniform1i(glGetUniformLocation(shaderProgram, "depthMap"), 2);
+        glUniform1f(glGetUniformLocation(shaderProgram, "far_plane"), far_plane);
 
         // Setup CAMERA and SPACE
 
@@ -893,6 +567,31 @@ namespace Graphics {
     }
 
     void Renderer::initFBO() {
+        // Create Framebuffer for Shadow
+        glGenFramebuffers(1, &depthMapFBO);
+        glGenTextures(1, &depthCubemap);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, depthCubemap);
+
+        // Create 6 empty Texture faces
+        for (unsigned int i = 0; i < 6; ++i) {
+            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_DEPTH_COMPONENT, 
+                         SHADOW_RES, SHADOW_RES, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+        }
+
+        // Prevent cracking or crazing of the finish along the edges
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+        // Attach to the FBO and tell OpenGL not to output color
+        glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+        glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, depthCubemap, 0);
+        glDrawBuffer(GL_NONE);
+        glReadBuffer(GL_NONE);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
         // Create FBO
         glGenFramebuffers(1, &FBO);
         glBindFramebuffer(GL_FRAMEBUFFER, FBO);
@@ -1006,5 +705,102 @@ namespace Graphics {
             // Force the camera to keep its view (front) aimed directly at the center of the target
             cameraFront = glm::normalize(targetPos - cameraPos);
         }
+    }
+
+    unsigned int Renderer::loadShaderFromFile(const char* vertexPath, const char* fragmentPath, const char* geometryPath) {
+        std::string vertexCode;
+        std::string fragmentCode;
+        std::ifstream vShaderFile;
+        std::ifstream fShaderFile;
+
+        vShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+        fShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+
+        try {
+            vShaderFile.open(vertexPath);
+            fShaderFile.open(fragmentPath);
+            std::stringstream vShaderStream, fShaderStream;
+
+            // Read file content
+            vShaderStream << vShaderFile.rdbuf();
+            fShaderStream << fShaderFile.rdbuf();
+            // Close file
+            vShaderFile.close();
+            fShaderFile.close();
+            // Convert stream to string
+            vertexCode = vShaderStream.str();
+            fragmentCode = fShaderStream.str();
+        } catch (std::ifstream::failure& e) {
+            std::cerr << "ERROR::SHADER::FILE_NOT_SUCCESFULLY_READ: " << vertexPath << " or " << fragmentPath << std::endl;
+        }
+
+        const char* vShaderCode = vertexCode.c_str();
+        const char* fShaderCode = fragmentCode.c_str();
+
+        unsigned int vertex, fragment;
+        int success;
+        char infoLog[512];
+
+        // Compile Vertex Shader
+        vertex = glCreateShader(GL_VERTEX_SHADER);
+        glShaderSource(vertex, 1, &vShaderCode, NULL);
+        glCompileShader(vertex);
+        glGetShaderiv(vertex, GL_COMPILE_STATUS, &success);
+        if (!success) {
+            glGetShaderInfoLog(vertex, 512, NULL, infoLog);
+            std::cerr << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog << std::endl;
+        }
+
+        // Compile Fragment Shader
+        fragment = glCreateShader(GL_FRAGMENT_SHADER);
+        glShaderSource(fragment, 1, &fShaderCode, NULL);
+        glCompileShader(fragment);
+        glGetShaderiv(fragment, GL_COMPILE_STATUS, &success);
+        if (!success) {
+            glGetShaderInfoLog(fragment, 512, NULL, infoLog);
+            std::cerr << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n" << infoLog << std::endl;
+        }
+
+        // Compile Geometry Shader
+        unsigned int geometry = 0;
+        if (geometryPath != nullptr) {
+            std::string geometryCode;
+            std::ifstream gShaderFile;
+            gShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+            try {
+                gShaderFile.open(geometryPath);
+                std::stringstream gShaderStream;
+                gShaderStream << gShaderFile.rdbuf();
+                gShaderFile.close();
+                geometryCode = gShaderStream.str();
+            } catch (std::ifstream::failure& e) {
+                std::cerr << "ERROR::SHADER::FILE_NOT_SUCCESSFULLY_READ: " << geometryPath << std::endl;
+            }
+            const char* gShaderCode = geometryCode.c_str();
+            geometry = glCreateShader(GL_GEOMETRY_SHADER);
+            glShaderSource(geometry, 1, &gShaderCode, NULL);
+            glCompileShader(geometry);
+        }
+
+        // Link Shader Program
+        unsigned int ID = glCreateProgram();
+        glAttachShader(ID, vertex);
+        glAttachShader(ID, fragment);
+        if (geometryPath != nullptr) {
+            glAttachShader(ID, geometry);
+        }
+        glLinkProgram(ID);
+        glGetProgramiv(ID, GL_LINK_STATUS, &success);
+        if (!success) {
+            glGetProgramInfoLog(ID, 512, NULL, infoLog);
+            std::cerr << "ERROR::SHADER::PROGRAM::LINKING_FAILED\n" << infoLog << std::endl;
+        }
+
+        // Clean trash
+        glDeleteShader(vertex);
+        glDeleteShader(fragment);
+        if (geometryPath != nullptr) glDeleteShader(geometry);
+
+        return ID;
     }
 }

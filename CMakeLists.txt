@@ -78,3 +78,10 @@ target_link_libraries(n_body PRIVATE
     glm::glm
     OpenGL::GL
 )
+
+# Copy shader assets next to the executable so they can be loaded at runtime
+add_custom_command(TARGET n_body POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_SOURCE_DIR}/assets"
+        "$<TARGET_FILE_DIR:n_body>/assets"
+)

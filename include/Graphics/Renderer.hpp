@@ -63,6 +63,15 @@ namespace Graphics {
 
             // Skybox shader
             unsigned int skyboxShaderProgram;
+
+            // Read and compile shader
+            unsigned int loadShaderFromFile(const char* vertexPath, const char* fragmentPath, const char* geometryPath = nullptr);
+
+            // Shadow mapping
+            unsigned int depthMapFBO;
+            unsigned int depthCubemap;
+            unsigned int shadowShaderProgram;
+            const unsigned int SHADOW_RES = 2048;
         public:
             Renderer(int w, int h, const char* title);
 
