@@ -60,6 +60,9 @@ namespace Graphics {
             unsigned int pingpongColorbuffers_Bloom[2];
 
             unsigned int blurShaderProgram;
+
+            // Skybox shader
+            unsigned int skyboxShaderProgram;
         public:
             Renderer(int w, int h, const char* title);
 
