@@ -1,19 +1,17 @@
 #include <iostream>
-#include <iomanip>
-#include <random>
 #include <cmath>
 #include <imgui.h>
 #include <Math/Vector3.hpp>
 #include <Simulation/Simulation.hpp>
 #include <Graphics/Renderer.hpp>
 
-int raycast(const glm::vec3& rayOrigin, const glm::vec3& rayDir, const std::vector<Vector3>& positions, const std::vector<double>& masses) {
+int raycast(const glm::vec3& rayOrigin, const glm::vec3& rayDir, const std::vector<Vector3>& positions, const std::vector<double>& radii) {
     int hitIndex = -1;
     float minDistance = 999999.0f; // Find the nearest planet if the ray passes through multiple planets
 
     for (size_t i = 0; i < positions.size(); ++i) {
         glm::vec3 center((float)positions[i].x, (float)positions[i].y, (float)positions[i].z);
-        float radius = (float)std::cbrt(masses[i]);
+        float radius = (float)radii[i];
 
         // Calculate the discriminant (Delta) for the quadratic equation
         glm::vec3 oc = rayOrigin - center;
@@ -35,51 +33,54 @@ int raycast(const glm::vec3& rayOrigin, const glm::vec3& rayDir, const std::vect
 }
 
 int main() {
-    // Initialise Engine
-    // G = 1.0, dt = 0.01
-    Simulation::System sim(1.0, 0.01);
+    // Reference frame:
+    // G = 0.000118549 (AU^3 / (M_earth * Year^2))
+    // dt = 0.001 (Approximately 0.365 days)
+    Simulation::System sim(0.000118549, 0.001);
 
-    // Create a super-massive gravitational star at the center (Index 0)
-    double centerMass = 10000.0;
-    sim.addBody(centerMass, Vector3::Zero, Vector3::Zero);
+    // Init Sun
+    Simulation::PlanetDesc sun;
+    sun.type = Simulation::BodyType::STAR;
+    sun.mass = 333000.0;
+    sun.position = Vector3::Zero;
+    sun.velocity = Vector3::Zero;
+    sun.angularVelocity = glm::vec3(0.0f, 10.0f, 0.0f);
+    sun.radius = 0.15;
+    sim.addBody(sun);
 
-    // Init random number generator
-    std::mt19937 gen(42);
-    std::uniform_real_distribution<double> distRadius(100.0, 800.0);
-    std::uniform_real_distribution<double> distAngle(0.0, 2.0 * 3.1415926535);
-    std::uniform_real_distribution<double> distY(-15.0, 15.0);
-    std::uniform_real_distribution<double> distMass(1.0, 5.0);
+    // Init Earth
+    Simulation::PlanetDesc earth;
+    earth.type = Simulation::BodyType::ROCKY_PLANET;
+    earth.mass = 1.0;
+    earth.position = Vector3(1.0, 0.0, 0.0); // At a distance of 1 AU from the Sun
+    earth.velocity = Vector3(0.0, 0.0, -6.28318); // 2*PI AU/Year
+    earth.angularVelocity = glm::vec3(0.0f, 365.0f, 0.0f); // Rotate 365/year
+    earth.albedo = 0.30;
+    earth.greenhouse = 1.13; // 255K -> 288K
+    earth.radius = 0.04;
+    sim.addBody(earth);
+    
+    // Init Mars
+    Simulation::PlanetDesc mars;
+    mars.type = Simulation::BodyType::ROCKY_PLANET;
+    mars.mass = 0.107;
+    mars.position = Vector3(1.524, 0.0, 0.0);
+    mars.velocity = Vector3(0.0, 0.0, -5.026);
+    mars.albedo = 0.25;
+    mars.greenhouse = 1.01;
+    mars.radius = 0.03;
+    sim.addBody(mars);
 
-    // Create 1000 asteroids
-    int numPlanets = 1000;
-    std::uniform_real_distribution<float> distAngularSpeed(-2.0f, 2.0f); // Rotational speed (rad/s)
-    for (int i = 0; i < numPlanets; ++i) {
-       //  Random coordinates with disk shaped
-       double r = distRadius(gen);
-       double theta = distAngle(gen);
-
-       double x = r * std::cos(theta);
-       double z = r * std::sin(theta);
-       double y = distY(gen);
-
-       Vector3 pos(x, y, z);
-
-       // Calculating tangential velocity to maintain the trajectory
-       double v_mag = std::sqrt(1.0 * centerMass / r);
-
-       // Use the mathematical cross product to obtain a vector perpendicular to the radial direction
-       Vector3 v_dir(z, 0.0, -x);
-       double dir_len = std::hypot(z, x);
-       v_dir = v_dir / dir_len;
-
-       Vector3 vel = v_dir * v_mag;
-
-       // Random rotation axis
-       glm::vec3 spinAxis(distAngularSpeed(gen), distAngularSpeed(gen), distAngularSpeed(gen));
-
-       // Add to the system
-       sim.addBody(distMass(gen), pos, vel, spinAxis);
-    }
+    // Init Jupiter
+    Simulation::PlanetDesc jupiter;
+    jupiter.type = Simulation::BodyType::GAS_GIANT;
+    jupiter.mass = 317.8;
+    jupiter.position = Vector3(5.204, 0.0, 0.0);
+    jupiter.velocity = Vector3(0.0, 0.0, -2.756);
+    jupiter.albedo = 0.52; // Ammonia clouds are highly reflective
+    jupiter.greenhouse = 1.0;
+    jupiter.radius = 0.10;
+    sim.addBody(jupiter);
 
     // Init graphics
     Graphics::Renderer renderer(1280, 720, "Galaxy Simulation");
@@ -92,9 +93,8 @@ int main() {
 
     // UI status vars
     float timeScale = 1.0f;         // Time speed
-    float newPlaneMass = 5000.0f;   // Mass of the planet about to be launched
     float shootSpeed = 300.0f;      // Lauch velocity
-    const double baseDt = 0.01f;    // Base time step
+    const double baseDt = 0.001;    // Base time step (~0.365 days)
 
     // Main loop
     int selectedEntity = -1;
@@ -109,12 +109,12 @@ int main() {
         renderer.processInput(deltaTime);
 
         // Apply time scale for physics
-        sim.SetDt(baseDt * timeScale);
+        sim.setDt(baseDt * timeScale);
         sim.step();
         renderer.clear();
 
-        // Upload 1001 objects into GPU
-        renderer.draw(sim.getBodyCount(), sim.getPositions(), sim.getMasses(), sim.getOrientations());
+        // Upload objects into GPU
+        renderer.draw(sim.getBodyCount(), sim.getPositions(), sim.getRadii(), sim.getOrientations());
 
         // Draw UI
         renderer.beginUI();
@@ -182,8 +182,16 @@ int main() {
             // Lauch velocity = Direction * Speed
             Vector3 vel(camFront.x * shootSpeed, camFront.y * shootSpeed, camFront.z * shootSpeed);
 
+            // Init Black Hole
+            Simulation::PlanetDesc blackhole;
+            blackhole.type = Simulation::BodyType::STAR;
+            blackhole.mass = 5000;
+            blackhole.position = pos;
+            blackhole.velocity = vel;
+            blackhole.radius = 0.20;
+
             // Load the new celestial body into the SoA system
-            sim.addBody(newPlaneMass, pos, vel);
+            sim.addBody(blackhole);
         }
 
         // Module 3: Interacting via Raycasting
@@ -196,7 +204,7 @@ int main() {
                 glm::vec3 rayDir = renderer.getRayDirection(mousePos.x, mousePos.y);
 
                 // Lauch laser ray into space
-                selectedEntity = raycast(renderer.getCameraPos(), rayDir, sim.getPositions(), sim.getMasses());
+                selectedEntity = raycast(renderer.getCameraPos(), rayDir, sim.getPositions(), sim.getRadii());
             }
         }
 

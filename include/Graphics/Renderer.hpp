@@ -64,7 +64,7 @@ namespace Graphics {
             void swapBuffers() const;
             void pollEvents() const;
 
-            void draw(size_t count, const std::vector<Vector3>& positions, const std::vector<double>& masses, const std::vector<glm::quat>& orientations) const;
+            void draw(size_t count, const std::vector<Vector3>& positions, const std::vector<double>& radii, const std::vector<glm::quat>& orientations) const;
             void processInput(float deltaTime); // Function to read keyboard and mouse input for movement
 
             void beginUI() const; // Start drawing the interface for the frame

@@ -38,11 +38,11 @@ namespace Graphics {
         }
 
         // Init default camera status
-        cameraPos = glm::vec3(0.0f, 150.0f, 300.0f);
-        cameraFront = glm::vec3(0.0f, -0.5f, -1.0f);
+        cameraPos = glm::vec3(0.0f, 6.0f, 12.0f);
+        cameraFront = glm::vec3(0.0f, -0.4f, -1.0f);
         cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
         yaw = -90.0f;
-        pitch = -26.5f;
+        pitch = -22.0f;
         lastX = width / 2.0f;
         lastY = height / 2.0f;
         firstMouse = true;
@@ -296,7 +296,7 @@ namespace Graphics {
         std::vector<float> vertices;
         std::vector<unsigned int> indices;
 
-        float radius = 0.5f;
+        float radius = 1.0f;
         float sectorStep = 2 * 3.14159265359f / sectorCount;
         float stackStep = 3.14159265359f / stackCount;
         float sectorAngle, stackAngle;
@@ -403,7 +403,7 @@ namespace Graphics {
         glfwSwapBuffers(window);
     }
 
-    void Renderer::draw(size_t count, const std::vector<Vector3>& positions, const std::vector<double>& masses, const std::vector<glm::quat>& orientations) const {
+    void Renderer::draw(size_t count, const std::vector<Vector3>& positions, const std::vector<double>& radii, const std::vector<glm::quat>& orientations) const {
         // Render the 3D universe to a Frame Buffer Object (FBO)
         glBindFramebuffer(GL_FRAMEBUFFER, FBO);
         glEnable(GL_DEPTH_TEST);
@@ -437,14 +437,14 @@ namespace Graphics {
         int lightRadiusLoc = glGetUniformLocation(shaderProgram, "lightRadius");
         if (count > 0) {
             glUniform3f(lightPosLoc, (float)positions[0].x, (float)positions[0].y, (float)positions[0].z);
-            // World-space radius = base sphere radius (0.5) * model scale (cbrt(mass))
-            glUniform1f(lightRadiusLoc, 0.5f * (float)std::cbrt(masses[0]));
+            // Host star's rendered radius
+            glUniform1f(lightRadiusLoc, (float)radii[0]);
         }
 
         for (size_t i = 0; i < count; ++i) {
             glm::mat4 model = glm::mat4(1.0f); 
             glm::vec3 pos((float)positions[i].x, (float)positions[i].y, (float)positions[i].z);
-            float radius = (float)std::cbrt(masses[i]);
+            float radius = (float)radii[i];
 
             // Displacement Matrix
             glm::mat4 translation = glm::translate(glm::mat4(1.0f), pos);
