@@ -5,17 +5,23 @@
 
 namespace Simulation {
     System::System(double gravityConstant, double timeStep)
-        : G(gravityConstant), dt(timeStep), octree(4000.0, positions, masses) {}
+        : G(gravityConstant), dt(timeStep), octree(positions, masses) {}
 
-    void System::addBody(double mass, const Vector3& pos, const Vector3& vel, const glm::vec3& angularVel) {
-        masses.push_back(mass);
-        positions.push_back(pos);
-        velocities.push_back(vel);
+    void System::addBody(const PlanetDesc& desc) {
+        masses.push_back(desc.mass);
+        positions.push_back(desc.position);
+        velocities.push_back(desc.velocity);
         accelerations.push_back(Vector3::Zero); // The initial acceleration is always zero
 
         // Identity Quaternion
         orientations.push_back(glm::quat(1.0f, 0.0f, 0.0f, 0.0f));
-        angularVelocities.push_back(angularVel);
+        angularVelocities.push_back(desc.angularVelocity);
+
+        types.push_back(desc.type);
+        albedos.push_back(desc.albedo);
+        greenhouses.push_back(desc.greenhouse);
+        temperatures.push_back(desc.temperature);
+        radii.push_back(desc.radius);
     }
 
     void System::removeBody(size_t index) {
@@ -29,6 +35,11 @@ namespace Simulation {
         accelerations[index] = accelerations[lastIdx];
         orientations[index] = orientations[lastIdx];
         angularVelocities[index] = angularVelocities[lastIdx];
+        types[index] = types[lastIdx];
+        albedos[index] = albedos[lastIdx];
+        greenhouses[index] = greenhouses[lastIdx];
+        temperatures[index] = temperatures[lastIdx];
+        radii[index] = radii[lastIdx];
 
         // Pop last index
         masses.pop_back();
@@ -37,6 +48,11 @@ namespace Simulation {
         accelerations.pop_back();
         orientations.pop_back();
         angularVelocities.pop_back();
+        types.pop_back();
+        albedos.pop_back();
+        greenhouses.pop_back();
+        temperatures.pop_back();
+        radii.pop_back();
     }
 
     void System::computeAcceleration() {
@@ -65,15 +81,50 @@ namespace Simulation {
         });
     }
 
+    void System::computeThermodynamics() {
+        size_t n = masses.size();
+
+        // Find the position of the host star (the Sun)
+        // Use the first star as the primary heat source
+        // FUTURE UPDATE: In a multi-star system, the total heat sources from multiple stars are combined
+        int starIndex = -1;
+        for (size_t i = 0; i < n; ++i) {
+            if (types[i] == BodyType::STAR) {
+                starIndex = i;
+                break;
+            }
+        }
+
+        for (size_t i = 0; i < n; ++i) {
+            if (types[i] == BodyType::STAR) {
+                temperatures[i] = 5778.0; // Sun's surface temperature
+                continue;
+            }
+
+            if (starIndex != -1) {
+                // Calculate the distance to the Sun (in AU)
+                Vector3 diff = positions[i] - positions[starIndex];
+                double distAU = diff.length();
+
+                if (distAU > 0.001) {
+                    // Stefan-Boltzmann heat balance equation
+                    double t = 278.3 * std::pow(1.0 - albedos[i], 0.25) / std::sqrt(distAU);
+                    temperatures[i] = t * greenhouses[i];
+                }
+            }
+            else {
+                // A rogue planet without a host star will freeze
+                temperatures[i] = 2.7; // Cosmic Microwave Background Radiation (CMBR) temperature
+            }
+        }
+    }
+
     void System::handleCollisions() {
         for (size_t i = 0; i < masses.size(); ++i) {
             for (size_t j = i + 1; j < masses.size(); ) {
-                // Calculate Collision Radius
-                // Based on Volume Proportional to Mass
-                // Spherical structure: V = 4/3 * π * R³ 
-                // => R is proportional to the cube root of M
-                double radiusI = std::cbrt(masses[i]);
-                double radiusJ = std::cbrt(masses[j]);
+                // Calculate Collision Radius (explicit physical radius in AU)
+                double radiusI = radii[i];
+                double radiusJ = radii[j];
                 double collisionDist = radiusI + radiusJ;
 
                 // Calculate the squared distance
@@ -86,12 +137,14 @@ namespace Simulation {
 
                     // Apply the law of conservation of momentum
                     velocities[i] = (velocities[i] * masses[i] + velocities[j] * masses[j]) / newMass;
+                    angularVelocities[i] = angularVelocities[i] + angularVelocities[j];
 
                     // The new position is the center of the two objects
                     positions[i] = (positions[i] * masses[i] + positions[j] * masses[j]) / newMass;
                     masses[i] = newMass;
 
-                    // Swap and Pop - O(1)
+                    // Delete the collison planet
+                    // Swap and Pop - O(1) 
                     size_t lastIdx = masses.size() - 1;
 
                     masses[j] = masses[lastIdx];
@@ -100,6 +153,11 @@ namespace Simulation {
                     accelerations[j] = accelerations[lastIdx];
                     orientations[j] = orientations[lastIdx];
                     angularVelocities[j] = angularVelocities[lastIdx];
+                    types[j] = types[lastIdx];
+                    albedos[j] = albedos[lastIdx];
+                    greenhouses[j] = greenhouses[lastIdx];
+                    temperatures[j] = temperatures[lastIdx];
+                    radii[j] = radii[lastIdx];
 
                     // Delete last index
                     masses.pop_back();
@@ -108,6 +166,11 @@ namespace Simulation {
                     accelerations.pop_back();
                     orientations.pop_back();
                     angularVelocities.pop_back();
+                    types.pop_back();
+                    albedos.pop_back();
+                    greenhouses.pop_back();
+                    temperatures.pop_back();
+                    radii.pop_back();
                 }
                 else {
                     ++j;
@@ -149,5 +212,8 @@ namespace Simulation {
         }
 
         handleCollisions();
+
+        // Tracking temperature changes as the planet's orbit shifts
+        computeThermodynamics();
     }
 }

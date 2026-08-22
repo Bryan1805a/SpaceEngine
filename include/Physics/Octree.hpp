@@ -53,8 +53,8 @@ namespace Physics {
             Vector3 calculateAccelImpl(int nodeIdx, int bodyIdx, double theta, double G) const;
         
         public:
-            // Initialize a tree of cosmic scale and connect it to SoA data
-            Octree(double rootSize, const std::vector<Vector3>& pos, const std::vector<double>& mass);
+            // Connect the tree to the SoA data
+            Octree(const std::vector<Vector3>& pos, const std::vector<double>& mass);
 
             // Rebuild the entire tree from scratch in every frame
             void build();

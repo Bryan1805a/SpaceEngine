@@ -1,7 +1,8 @@
 #include <Physics/Octree.hpp>
+#include <algorithm>
 
 namespace Physics {
-    Octree::Octree(double rootSize, const std::vector<Vector3>& pos, const std::vector<double>& mass)
+    Octree::Octree(const std::vector<Vector3>& pos, const std::vector<double>& mass)
         : positions(pos), masses(mass) {
         // Pre-allocate memory for the tree to 
         // avoid performance degradation caused by frequent reallocations
@@ -76,8 +77,31 @@ namespace Physics {
 
     void Octree::build() {
         nodes.clear();
-        // Initialize the universe with its center at (0, 0, 0) and an extremely large size
-        rootIndex = createNode(Vector3::Zero, 2000.0);
+        if (positions.empty()) {
+            rootIndex = createNode(Vector3::Zero, 1.0);
+            return;
+        }
+
+        // Compute the bounding box of all bodies so the root adapts
+        // to the actual simulation scale (galaxy, solar system, etc.)
+        Vector3 min = positions[0];
+        Vector3 max = positions[0];
+        for (size_t i = 1; i < positions.size(); ++i) {
+            const Vector3& p = positions[i];
+            min.x = std::min(min.x, p.x);
+            min.y = std::min(min.y, p.y);
+            min.z = std::min(min.z, p.z);
+            max.x = std::max(max.x, p.x);
+            max.y = std::max(max.y, p.y);
+            max.z = std::max(max.z, p.z);
+        }
+
+        Vector3 center = (min + max) * 0.5;
+        double extent = std::max({ max.x - min.x, max.y - min.y, max.z - min.z });
+        // Enforce a minimum size for co-located bodies, plus a small margin
+        double size = std::max(extent, 1.0) * 1.001;
+
+        rootIndex = createNode(center, size);
 
         for (size_t i = 0; i < positions.size(); ++i) {
             insertImpl(rootIndex, i);
