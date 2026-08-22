@@ -32,6 +32,17 @@ int raycast(const glm::vec3& rayOrigin, const glm::vec3& rayDir, const std::vect
     return hitIndex;
 }
 
+const char* bodyTypeName(Simulation::BodyType type) {
+    switch (type) {
+        case Simulation::BodyType::STAR: return "Star";
+        case Simulation::BodyType::ROCKY_PLANET: return "Rocky Planet";
+        case Simulation::BodyType::GAS_GIANT: return "Gas Giant";
+        case Simulation::BodyType::ICE_MOON: return "Ice Moon";
+        case Simulation::BodyType::ASTEROID: return "Asteroid";
+        default: return "Unknown";
+    }
+}
+
 int main() {
     // Reference frame:
     // G = 0.000118549 (AU^3 / (M_earth * Year^2))
@@ -107,6 +118,9 @@ int main() {
         // Operating System Event Handling and Movement Logic
         renderer.pollEvents();
         renderer.processInput(deltaTime);
+
+        // Update camera
+        renderer.updateCameraTracking(sim.getPositions());
 
         // Apply time scale for physics
         sim.setDt(baseDt * timeScale);
@@ -215,20 +229,43 @@ int main() {
             ImGui::Separator();
             ImGui::Spacing();
 
-            ImGui::TextColored(ImVec4(0.5f, 1.0f, 0.5f, 1.0f), "Target Lockeed: Entity #%d", selectedEntity);
+            ImGui::TextColored(ImVec4(0.5f, 1.0f, 0.5f, 1.0f), "Target Locked: Entity #%d", selectedEntity);
 
-            double m = sim.getMasses()[selectedEntity];
-            Vector3 p = sim.getPositions()[selectedEntity];
+            ImGui::Text("Temperature: %.1f K", sim.getTemperatures()[selectedEntity]);
+            ImGui::Text("Type: %s", bodyTypeName(sim.getTypes()[selectedEntity]));
 
-            ImGui::Text("Mass: %.2f", m);
-            ImGui::Text("Position: (%.0f, %.0f, %.0f)", p.x, p.y, p.z);
+            ImGui::Spacing();
+
+            // Camera Tracking button
+            if (renderer.isTargetLocked() && renderer.getLockedTargetIndex() == selectedEntity) {
+                if (ImGui::Button("Unlock Camera", ImVec2(-1, 30))) {
+                    renderer.unlockTarget();
+                }
+            }
+            else {
+                if (ImGui::Button("Track Orbit (Follow)", ImVec2(-1, 30))) {
+                    float viewDistance = (float)log10(sim.getMasses()[selectedEntity] + 1.0) * 8.0f + 5.0f;
+                    renderer.lockTarget(selectedEntity, viewDistance);
+                }
+            }
 
             // Destroy a planet button
             if (ImGui::Button("Destroy Entity", ImVec2(-1, 30))) {
+                if (renderer.isTargetLocked() && renderer.getLockedTargetIndex() == selectedEntity) {
+                    renderer.unlockTarget();
+                }
                 sim.removeBody(selectedEntity);
                 selectedEntity = -1;
             }
         }
+
+        // Module 4: Camera Speed Settings
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.5f, 1.0f), "Navigation Settings");
+        ImGui::SliderFloat("Camera Speed", &renderer.cameraBaseSpeed, 1.0f, 500.0f, "%.1f units/s");
 
         ImGui::End();
 

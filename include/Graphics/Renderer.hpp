@@ -35,6 +35,11 @@ namespace Graphics {
             float lastY; // Mouse Y-coordinate in the previous frame
             bool firstMouse; // First mouse-over check
 
+            int lockedTargetIndex; // The index of locked planet (-1 is free-flight mode)
+            float orbitDistance; // Distance from the camera to the center of the planet
+            float orbitTheta; // Horizontal rotation angle (yaw) during orbiting
+            float orbitPhi; // Vertical pitch angle during orbit
+
             // Post-Processing and FBO
             unsigned int FBO;
             unsigned int textureColorbuffer; // Ordinary scenery
@@ -72,7 +77,7 @@ namespace Graphics {
                       const std::vector<glm::quat>& orientations,
                       const std::vector<Simulation::BodyType>& types,
                       const std::vector<double>& temperatures) const;
-                      
+
             void processInput(float deltaTime); // Function to read keyboard and mouse input for movement
 
             void beginUI() const; // Start drawing the interface for the frame
@@ -81,6 +86,14 @@ namespace Graphics {
             // Get camera data for UI
             glm::vec3 getCameraPos() const {return cameraPos;}
             glm::vec3 getCameraFront() const {return cameraFront;}
+
+            // API for Camera Tracking
+            float cameraBaseSpeed;
+            void lockTarget(int entityIndex, float distance = 50.0f);
+            void unlockTarget();
+            bool isTargetLocked() const { return lockedTargetIndex != -1; }
+            int getLockedTargetIndex() const { return lockedTargetIndex; }
+            void updateCameraTracking(const std::vector<Vector3>& positions);
 
             // Declare a function to expose the window to main.cpp for reading the ALT key
             GLFWwindow* getWindow() const {return window;}

@@ -46,6 +46,11 @@ namespace Graphics {
         lastX = width / 2.0f;
         lastY = height / 2.0f;
         firstMouse = true;
+        cameraBaseSpeed = 50.0f;
+        lockedTargetIndex = -1;
+        orbitDistance = 20.0f;
+        orbitTheta = 0.0f;
+        orbitPhi = 0.0f;
         // Lock the mouse cursor to the center of the screen and hide it
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
@@ -214,11 +219,23 @@ namespace Graphics {
                 } 
                 // 3. GAS PLANET (Jupiter)
                 else if (bodyType == 2) { 
-                    // Sọc mây vắt ngang trục Y
+                    // Cloud bands running across the Y axis
                     float bands = fbm(vec3(LocalPos.y * 15.0, LocalPos.x, LocalPos.z));
                     vec3 gas1 = vec3(0.7, 0.6, 0.5);
                     vec3 gas2 = vec3(0.5, 0.3, 0.1);
                     resultColor = mix(gas1, gas2, bands) * (ambient + diff);
+                }
+                // 4. ICE MOON
+                else if (bodyType == 3) {
+                    float craters = fbm(LocalPos * 6.0);
+                    vec3 ice = mix(vec3(0.5, 0.6, 0.7), vec3(0.9, 0.95, 1.0), craters);
+                    resultColor = ice * (ambient + diff);
+                }
+                // 5. ASTEROID
+                else if (bodyType == 4) {
+                    float rough = fbm(LocalPos * 8.0);
+                    vec3 rock = mix(vec3(0.2, 0.18, 0.15), vec3(0.45, 0.42, 0.38), rough);
+                    resultColor = rock * (ambient + diff);
                 }
 
                 FragColor = vec4(resultColor, 1.0);
@@ -630,23 +647,6 @@ namespace Graphics {
             glfwSetWindowShouldClose(window, true);
         }
 
-        // Handle W, A, S, D key movement
-        // Flight speed: 150 units/second
-        float cameraSpeed = 150.0f * deltaTime;
-        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
-            cameraPos += cameraSpeed * cameraFront;
-        }
-        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
-            cameraPos -= cameraSpeed * cameraFront;
-        }
-        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
-            cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
-        }
-        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
-            cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
-        }
-
-
         // Unlock mouse cursor while holding Left Alt, re-lock on release
         if (glfwGetKey(window, GLFW_KEY_LEFT_ALT) == GLFW_PRESS) {
             glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
@@ -654,41 +654,97 @@ namespace Graphics {
         }
         else {
             glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-
-            // Handling Viewpoint Rotation with the Mouse
-            // Using Trigonometry
-            double xpos, ypos;
-            glfwGetCursorPos(window, &xpos, &ypos);
-
-            if (firstMouse) {
-                lastX = (float)xpos;
-                lastY = (float)ypos;
-                firstMouse = false;
+        }
+        
+        // Mode 1: Lock Target
+        // Camera follow plantary orbit
+        if (lockedTargetIndex != -1) {
+            // W,S to narrow or widen the viewing distance
+            float zoomSpeed = cameraBaseSpeed * 0.5f * deltaTime;
+            if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+                orbitDistance -= zoomSpeed;
+            }
+            if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+                orbitDistance += zoomSpeed;
+            }
+            if (orbitDistance < 2.0f) {
+                orbitDistance = 2.0f;
+            }
+            if (orbitDistance > 500.0f) {
+                orbitDistance = 500.0f;
             }
 
-            float xoffset = (float)xpos - lastX;
-            float yoffset = lastY - (float)ypos; // The mouse's Y-axis is inverted relative to 3D coordinates
-            lastX = (float)xpos;
-            lastY = (float)ypos;
+            // If left Alt is not pressed
+            if (!(glfwGetKey(window, GLFW_KEY_LEFT_ALT) == GLFW_PRESS)) {
+                double xpos, ypos;
 
-            float sensitivity = 0.1f;
-            xoffset *= sensitivity;
-            yoffset *= sensitivity;
+                glfwGetCursorPos(window, &xpos, &ypos);
+                if (firstMouse) {
+                    lastX = (float)xpos;
+                    lastY = (float)ypos;
+                    firstMouse = false;
+                }
 
-            yaw += xoffset;
-            pitch += yoffset;
+                float xoffset = (float)xpos - lastX;
+                float yoffset = (float)ypos - lastY;
+                lastX = (float)xpos;
+                lastY = (float)ypos;
 
-            // Lock the tilt angle to prevent the camera from flipping over
-            if (pitch > 89.0f) pitch = 89.0f;
-            if (pitch < -89.0f) pitch = -89.0f;
+                float sensitivity = 0.005f;
+                orbitTheta += xoffset * sensitivity;
+                orbitPhi += yoffset * sensitivity;
 
-            // Recalculate the view direction vector using sine and cosine
-            glm::vec3 front;
-            front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
-            front.y = sin(glm::radians(pitch));
-            front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
-            cameraFront = glm::normalize(front);
+                // Lock the tilt angle to prevent the camera from flipping over
+                if (orbitPhi > 1.5f) orbitPhi = 1.5f;
+                if (orbitPhi < -1.5f) orbitPhi = -1.5f;
+            }
         }
+
+        // Mode 2
+        // Free-Fly
+        else {
+            float moveSpeed = cameraBaseSpeed * deltaTime;
+            if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+                cameraPos += moveSpeed * cameraFront;
+            }
+            if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+                cameraPos -= moveSpeed * cameraFront;
+            }
+            if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
+                cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * moveSpeed;
+            }
+            if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+                cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * moveSpeed;
+            }
+
+            if (!(glfwGetKey(window, GLFW_KEY_LEFT_ALT) == GLFW_PRESS)) {
+                double xpos, ypos;
+                glfwGetCursorPos(window, &xpos, &ypos);
+                if (firstMouse) {
+                    lastX = (float)xpos;
+                    lastY = (float)ypos;
+                    firstMouse = false;
+                }
+
+                float xoffset = (float)xpos - lastX;
+                float yoffset = lastY - (float)ypos;
+                lastX = (float)xpos;
+                lastY = (float)ypos;
+
+                float sensitivity = 0.1f;
+                yaw += xoffset * sensitivity;
+                pitch += yoffset * sensitivity;
+                if (pitch > 89.0f) pitch = 89.0f;
+                if (pitch < -89.0f) pitch = -89.0f;
+
+                glm::vec3 front;
+                front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+                front.y = sin(glm::radians(pitch));
+                front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+                cameraFront = glm::normalize(front);
+            }
+        }
+        
     }
 
     void Renderer::beginUI() const {
@@ -801,6 +857,39 @@ namespace Graphics {
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
             glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pingpongColorbuffers_Bloom[i], 0);
+        }
+    }
+
+    void Renderer::lockTarget(int entityIndex, float distance) {
+        lockedTargetIndex = entityIndex;
+        orbitDistance = distance;
+        orbitTheta = 0.0f;
+        orbitPhi = 0.0f;
+
+        // When locking onto a target, hide the cursor to use the mouse for rotating the camera orbit
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        firstMouse = true;
+    }
+
+    void Renderer::unlockTarget() {
+        lockedTargetIndex = -1;
+    }
+
+    void Renderer::updateCameraTracking(const std::vector<Vector3>& positions) {
+        if (lockedTargetIndex != -1 && static_cast<size_t>(lockedTargetIndex) < positions.size()) {
+            Vector3 target = positions[lockedTargetIndex];
+            glm::vec3 targetPos((float)target.x, (float)target.y, (float)target.z);
+
+            // Use trigonometry to convert spherical coordinates (orbitTheta, orbitPhi, orbitDistance) into Cartesian coordinates (X, Y, Z)
+            float camX = orbitDistance * cos(orbitPhi) * cos(orbitTheta);
+            float camY = orbitDistance * sin(orbitPhi);
+            float camZ = orbitDistance * cos(orbitPhi) * sin(orbitTheta);
+
+            // Lock the camera onto the target
+            cameraPos = targetPos + glm::vec3(camX, camY, camZ);
+
+            // Force the camera to keep its view (front) aimed directly at the center of the target
+            cameraFront = glm::normalize(targetPos - cameraPos);
         }
     }
 }
