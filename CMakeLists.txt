@@ -61,6 +61,7 @@ add_executable(n_body
     src/Graphics/Shader.cpp
     src/Graphics/Camera.cpp
     src/Graphics/Mesh.cpp
+    src/Graphics/PostProcessor.cpp
     src/Physics/Octree.cpp
 
     # Compiling with ImGui source code

@@ -8,6 +8,7 @@
 #include <Graphics/Shader.hpp>
 #include <Graphics/Camera.hpp>
 #include <Graphics/Mesh.hpp>
+#include <Graphics/PostProcessor.hpp>
 
 namespace Graphics {
     class Renderer {
@@ -26,24 +27,15 @@ namespace Graphics {
             // Camera system
             Camera camera;
 
-            // Post-Processing and FBO
-            unsigned int FBO;
-            unsigned int textureColorbuffer; // Ordinary scenery
-            unsigned int textureBloombuffer; // Contains only the bloom area
-            unsigned int RBO; // Renderbuffer for Depth
+            // Post-Processing (offscreen FBO + bloom + screen composite)
+            PostProcessor postProcessor;
 
             Mesh quad;
             Shader screenShaderProgram;
 
-            void initFBO();
-
-            // Gaussian Blur for UI blur
-            unsigned int pingpongFBO[2];
-            unsigned int pingpongColorbuffers[2];
-
-            // Gaussian blur for bloom
-            unsigned int pingpongFBO_Bloom[2];
-            unsigned int pingpongColorbuffers_Bloom[2];
+            // Gaussian Blur for the UI frosted-glass background
+            unsigned int uiPingpongFBO[2];
+            unsigned int uiPingpongColorbuffers[2];
 
             Shader blurShaderProgram;
 
@@ -55,6 +47,9 @@ namespace Graphics {
             unsigned int depthCubemap;
             Shader shadowShaderProgram;
             const unsigned int SHADOW_RES = 2048;
+
+            // Create the shadow-map FBO and the UI-blur pingpong buffers
+            void initFramebuffers();
         public:
             Renderer(int w, int h, const char* title);
 
@@ -96,6 +91,6 @@ namespace Graphics {
             // Declare a function to calculate the ray direction
             glm::vec3 getRayDirection(float mouseX, float mouseY) const;
 
-            unsigned int getBlurredTexture() const { return pingpongColorbuffers[0]; }
+            unsigned int getBlurredTexture() const { return uiPingpongColorbuffers[0]; }
     };
 }

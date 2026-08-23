@@ -54,7 +54,9 @@ namespace Graphics {
         // Preparing GPU data
         initShaders();
         sphere.initSphere(36, 18);
-        initFBO();
+        quad.initQuad();
+        postProcessor.init(width, height);
+        initFramebuffers();
 
         // Init ImGui
         IMGUI_CHECKVERSION();
@@ -101,6 +103,10 @@ namespace Graphics {
         // Clean CPU resources before closing window
         sphere.cleanup();
         quad.cleanup();
+        glDeleteFramebuffers(1, &depthMapFBO);
+        glDeleteTextures(1, &depthCubemap);
+        glDeleteFramebuffers(2, uiPingpongFBO);
+        glDeleteTextures(2, uiPingpongColorbuffers);
         glDeleteProgram(shaderProgram.ID);
         glDeleteProgram(screenShaderProgram.ID);
         glDeleteProgram(blurShaderProgram.ID);
@@ -170,11 +176,8 @@ namespace Graphics {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glViewport(0, 0, width, height);
         
-        // Render the 3D universe to a Frame Buffer Object (FBO)
-        glBindFramebuffer(GL_FRAMEBUFFER, FBO);
-        glEnable(GL_DEPTH_TEST);
-        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        // Render the 3D universe to the off-screen frame buffer
+        postProcessor.beginRender();
         
         // Activate Shader Program
         shaderProgram.use();
@@ -249,7 +252,7 @@ namespace Graphics {
             sphere.draw();
         }
 
-        // Appy Gaussian Blur
+        // Apply Gaussian Blur for the UI frosted-glass background
         bool horizontal = true, first_iteration = true;
         unsigned int amount = 10;
 
@@ -259,11 +262,11 @@ namespace Graphics {
         float weights[5] = { 0.227027f, 0.1945946f, 0.1216216f, 0.054054f, 0.016216f };
         blurShaderProgram.setFloatArray("weight", weights, 5);
         for (unsigned int i = 0; i < amount; i++) {
-            glBindFramebuffer(GL_FRAMEBUFFER, pingpongFBO[horizontal]);
+            glBindFramebuffer(GL_FRAMEBUFFER, uiPingpongFBO[horizontal]);
             blurShaderProgram.setBool("horizontal", horizontal);
 
-            // Get image from main FBO
-            glBindTexture(GL_TEXTURE_2D, first_iteration ? textureColorbuffer : pingpongColorbuffers[!horizontal]);
+            // Get image from the scene color buffer
+            glBindTexture(GL_TEXTURE_2D, first_iteration ? postProcessor.textureColorbuffer : uiPingpongColorbuffers[!horizontal]);
 
             quad.draw();
 
@@ -273,48 +276,9 @@ namespace Graphics {
             }
         }
 
-        // Apply Gaussian Blur for Bloom
-        bool horizontal_bloom = true;
-        bool first_iteration_bloom = true;
-        unsigned int amount_bloom = 15;
-
-        blurShaderProgram.use();
-        for (unsigned int i = 0; i < amount_bloom; i++) {
-            glBindFramebuffer(GL_FRAMEBUFFER, pingpongFBO_Bloom[horizontal_bloom]);
-            blurShaderProgram.setBool("horizontal", horizontal_bloom);
-
-            glBindTexture(GL_TEXTURE_2D, first_iteration_bloom ? textureBloombuffer : pingpongColorbuffers_Bloom[!horizontal_bloom]);
-
-            quad.draw();
-
-            horizontal_bloom = !horizontal_bloom;
-            if (first_iteration_bloom) {
-                first_iteration_bloom = false;
-            }
-        }
-
-        // Paste the FBO image onto the screen and apply a filter
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glDisable(GL_DEPTH_TEST);
-        glClear(GL_COLOR_BUFFER_BIT);
-
-        screenShaderProgram.use();
-
-        // Assign the scenery texture to Slot 0
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, textureColorbuffer);
-        screenShaderProgram.setInt("screenTexture", 0);
-
-        // Attach the blurred bloom texture to Slot 1
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, pingpongColorbuffers_Bloom[!horizontal_bloom]);
-        screenShaderProgram.setInt("bloomBlur", 1);
-        
-        quad.draw();
-
-        // Unbind VAO after drawing is complete
-        glBindVertexArray(0);
-        glEnable(GL_DEPTH_TEST);
+        // Apply Gaussian Blur for Bloom, then composite everything to the screen
+        postProcessor.applyBlur(blurShaderProgram, quad);
+        postProcessor.renderToScreen(screenShaderProgram, quad);
     }
 
     void Renderer::pollEvents() const {
@@ -361,7 +325,7 @@ namespace Graphics {
         return glm::normalize(ray_wor);
     }
 
-    void Renderer::initFBO() {
+    void Renderer::initFramebuffers() {
         // Create Framebuffer for Shadow
         glGenFramebuffers(1, &depthMapFBO);
         glGenTextures(1, &depthCubemap);
@@ -387,69 +351,20 @@ namespace Graphics {
         glReadBuffer(GL_NONE);
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-        // Create FBO
-        glGenFramebuffers(1, &FBO);
-        glBindFramebuffer(GL_FRAMEBUFFER, FBO);
-
-        // Create a texture to store the colors of the universe
-        glGenTextures(1, &textureColorbuffer);
-        glBindTexture(GL_TEXTURE_2D, textureColorbuffer);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, NULL);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        // Assign Texture to FBO
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureColorbuffer, 0);
-
-        // Bloom effect
-        glGenTextures(1, &textureBloombuffer);
-        glBindTexture(GL_TEXTURE_2D, textureBloombuffer);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, textureBloombuffer, 0);
-
-        unsigned int attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
-        glDrawBuffers(2, attachments);
-
-        // Create RBP to processing Depth
-        glGenRenderbuffers(1, &RBO);
-        glBindRenderbuffer(GL_RENDERBUFFER, RBO);
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height);
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, RBO);
-
-        // Return default FBO of display
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-        // Init Screen Quad
-        quad.initQuad();
-
-        // Init Ping Pong FBOs for Gaussian Blur
-        glGenFramebuffers(2, pingpongFBO);
-        glGenTextures(2, pingpongColorbuffers);
+        // Init Ping Pong FBOs for the UI frosted-glass blur
+        glGenFramebuffers(2, uiPingpongFBO);
+        glGenTextures(2, uiPingpongColorbuffers);
         for (unsigned int i = 0; i < 2; i++) {
-            glBindFramebuffer(GL_FRAMEBUFFER, pingpongFBO[i]);
-            glBindTexture(GL_TEXTURE_2D, pingpongColorbuffers[i]);
+            glBindFramebuffer(GL_FRAMEBUFFER, uiPingpongFBO[i]);
+            glBindTexture(GL_TEXTURE_2D, uiPingpongColorbuffers[i]);
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pingpongColorbuffers[i], 0);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, uiPingpongColorbuffers[i], 0);
         }
-
-        // Init Ping-Pong FBOs for bloom
-        glGenFramebuffers(2, pingpongFBO_Bloom);
-        glGenTextures(2, pingpongColorbuffers_Bloom);
-        for (unsigned int i = 0; i < 2; i++) {
-            glBindFramebuffer(GL_FRAMEBUFFER, pingpongFBO_Bloom[i]);
-            glBindTexture(GL_TEXTURE_2D, pingpongColorbuffers_Bloom[i]);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGB, GL_FLOAT, NULL);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pingpongColorbuffers_Bloom[i], 0);
-        }
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
     void Renderer::lockTarget(int entityIndex, float distance) {
