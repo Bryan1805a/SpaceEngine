@@ -2,10 +2,18 @@
 #include <algorithm>
 
 namespace Physics {
+    Octree::Octree() : positions(nullptr), masses(nullptr), rootIndex(-1) {}
+
     Octree::Octree(const std::vector<Vector3>& pos, const std::vector<double>& mass)
-        : positions(pos), masses(mass) {
+        : positions(&pos), masses(&mass), rootIndex(-1) {
         // Pre-allocate memory for the tree to 
         // avoid performance degradation caused by frequent reallocations
+        nodes.reserve(pos.size() * 4);
+    }
+
+    void Octree::bind(const std::vector<Vector3>& pos, const std::vector<double>& mass) {
+        positions = &pos;
+        masses = &mass;
         nodes.reserve(pos.size() * 4);
     }
 
@@ -25,8 +33,8 @@ namespace Physics {
 
     void Octree::insertImpl(int nodeIdx, int bodyIdx) {
         OctreeNode& node = nodes[nodeIdx];
-        Vector3 bodyPos = positions[bodyIdx];
-        double bodyMass = masses[bodyIdx];
+        Vector3 bodyPos = (*positions)[bodyIdx];
+        double bodyMass = (*masses)[bodyIdx];
 
         // Update the total mass and center of mass 
         // for this node during the downward pass.
@@ -65,7 +73,7 @@ namespace Physics {
             nodes[nodeIdx].bodyIndex = -1; // This node become branch
 
                 // Recursive to move the old body down
-            int oldOctant = getOctant(nodes[nodeIdx].center, positions[oldBodyIdx]);
+            int oldOctant = getOctant(nodes[nodeIdx].center, (*positions)[oldBodyIdx]);
             insertImpl(nodes[nodeIdx].children[oldOctant], oldBodyIdx);
         }
 
@@ -77,17 +85,17 @@ namespace Physics {
 
     void Octree::build() {
         nodes.clear();
-        if (positions.empty()) {
+        if (positions->empty()) {
             rootIndex = createNode(Vector3::Zero, 1.0);
             return;
         }
 
         // Compute the bounding box of all bodies so the root adapts
         // to the actual simulation scale (galaxy, solar system, etc.)
-        Vector3 min = positions[0];
-        Vector3 max = positions[0];
-        for (size_t i = 1; i < positions.size(); ++i) {
-            const Vector3& p = positions[i];
+        Vector3 min = (*positions)[0];
+        Vector3 max = (*positions)[0];
+        for (size_t i = 1; i < positions->size(); ++i) {
+            const Vector3& p = (*positions)[i];
             min.x = std::min(min.x, p.x);
             min.y = std::min(min.y, p.y);
             min.z = std::min(min.z, p.z);
@@ -103,7 +111,7 @@ namespace Physics {
 
         rootIndex = createNode(center, size);
 
-        for (size_t i = 0; i < positions.size(); ++i) {
+        for (size_t i = 0; i < positions->size(); ++i) {
             insertImpl(rootIndex, i);
         }
     }
@@ -117,7 +125,7 @@ namespace Physics {
         if (nodeIdx == -1) return Vector3::Zero;
 
         const OctreeNode& node = nodes[nodeIdx];
-        Vector3 bodyPos = positions[bodyIdx];
+        Vector3 bodyPos = (*positions)[bodyIdx];
 
         // Rule 1: A planet cannot attract itself
         if (node.isLeaf() && node.bodyIndex == bodyIdx) {

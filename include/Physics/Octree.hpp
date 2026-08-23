@@ -35,8 +35,8 @@ namespace Physics {
     class Octree {
         private:
             std::vector<OctreeNode> nodes;
-            const std::vector<Vector3>& positions; // Reference to Position array
-            const std::vector<double>& masses;     // Reference tot Mass Array
+            const std::vector<Vector3>* positions; // Pointer to Position array
+            const std::vector<double>* masses;     // Pointer to Mass Array
 
             int rootIndex;
 
@@ -53,8 +53,14 @@ namespace Physics {
             Vector3 calculateAccelImpl(int nodeIdx, int bodyIdx, double theta, double G) const;
         
         public:
+            // Default constructor (unbound; call bind() before use)
+            Octree();
+
             // Connect the tree to the SoA data
             Octree(const std::vector<Vector3>& pos, const std::vector<double>& mass);
+
+            // (Re)connect the tree to a set of SoA data
+            void bind(const std::vector<Vector3>& pos, const std::vector<double>& mass);
 
             // Rebuild the entire tree from scratch in every frame
             void build();

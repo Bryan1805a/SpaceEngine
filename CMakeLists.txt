@@ -55,6 +55,8 @@ add_executable(n_body
     src/glad.c
     include/Simulation/Simulation.hpp
     src/Simulation/Simulation.cpp
+    src/Simulation/World.cpp
+    src/Simulation/Systems.cpp
     src/Graphics/Renderer.cpp
     src/Graphics/Shader.cpp
     src/Graphics/Camera.cpp
