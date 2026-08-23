@@ -233,7 +233,7 @@ int main() {
             ImGui::End();
         }
 
-        // ============  SYSTEM INFO (top-left)  ============
+        // SYSTEM INFO (top-left)
         if (showSystemInfo) {
             ImGui::SetNextWindowPos(ImVec2(62, 8), ImGuiCond_FirstUseEver);
             ImGui::SetNextWindowSize(ImVec2(270, 0), ImGuiCond_FirstUseEver);
@@ -254,7 +254,7 @@ int main() {
             ImGui::End();
         }
 
-        // ============  OVERVIEW (right dock)  ============
+        // OVERVIEW (right dock)
         if (showOverview) {
             float w = 330.0f;
             ImGui::SetNextWindowPos(ImVec2((float)renderer.getWidth() - w - 8, 8), ImGuiCond_Always);
@@ -321,7 +321,7 @@ int main() {
             ImGui::End();
         }
 
-        // ============  SELECTED ITEM (top-right)  ============
+        // SELECTED ITEM (top-right)
         if (showSelected) {
             ImGui::SetNextWindowPos(ImVec2((float)renderer.getWidth() - 340.0f, 8), ImGuiCond_Always);
             ImGui::SetNextWindowSize(ImVec2(332, 0), ImGuiCond_Always);
@@ -381,7 +381,7 @@ int main() {
             ImGui::End();
         }
 
-        // ============  NAVIGATION / TIME (bottom-left)  ============
+        //NAVIGATION / TIME (bottom-left)
         if (showNav) {
             ImGui::SetNextWindowPos(ImVec2(62, (float)renderer.getHeight() - 150), ImGuiCond_Always);
             ImGui::SetNextWindowSize(ImVec2(290, 142), ImGuiCond_Always);
@@ -420,7 +420,7 @@ int main() {
             ImGui::End();
         }
 
-        // ============  TACTICAL HUD (bottom-center)  ============
+        // TACTICAL HUD (bottom-center)
         if (showHud) {
             ImGui::SetNextWindowPos(ImVec2((float)renderer.getWidth() * 0.5f - 120.0f, (float)renderer.getHeight() - 78.0f), ImGuiCond_Always);
             ImGui::SetNextWindowSize(ImVec2(240, 74), ImGuiCond_Always);
@@ -467,7 +467,7 @@ int main() {
             ImGui::End();
         }
 
-        // ============  IN-VIEWPORT 3D BRACKETS  ============
+        // IN-VIEWPORT 3D BRACKETS
         {
             ImDrawList* fg = ImGui::GetForegroundDrawList();
             for (size_t i = 0; i < bPos.size(); ++i) {

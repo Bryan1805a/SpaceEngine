@@ -53,6 +53,7 @@ find_package(OpenGL REQUIRED)
 add_executable(SpaceEngine
     src/main.cpp
     src/glad.c
+    src/stb_image.cpp
     include/Simulation/Simulation.hpp
     src/Simulation/Simulation.cpp
     src/Simulation/World.cpp
@@ -75,6 +76,7 @@ add_executable(SpaceEngine
 
 target_include_directories(SpaceEngine PRIVATE
     "${CMAKE_SOURCE_DIR}/include"
+    "${CMAKE_SOURCE_DIR}/third_party"
     ${imgui_dir}
     ${imgui_dir}/backends
 )

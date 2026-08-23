@@ -58,6 +58,8 @@ namespace Graphics {
             Shader shadowShaderProgram;
             const unsigned int SHADOW_RES = 2048;
 
+            unsigned int loadHDRTexture(const char* path);
+
             // Create the shadow-map FBO and the UI-blur pingpong buffers
             void initFramebuffers();
         public:

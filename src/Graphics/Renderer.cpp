@@ -13,6 +13,7 @@
 #include <imgui.h>
 #include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_opengl3.h>
+#include <stb_image.h>
 
 namespace Graphics {
     Renderer::Renderer(int w, int h, const char* title) : width(w), height(h), window(nullptr) {
@@ -542,5 +543,30 @@ namespace Graphics {
         camera.updateTracking(positions);
     }
 
-    
+    unsigned int Renderer::loadHDRTexture(const char* path) {
+        // Flip
+        stbi_set_flip_vertically_on_load(true);
+        
+        int width, height, nrComponents;
+        float *data = stbi_loadf(path, &width, &height, &nrComponents, 0);
+        
+        unsigned int hdrTexture = 0;
+        if (data) {
+            glGenTextures(1, &hdrTexture);
+            glBindTexture(GL_TEXTURE_2D, hdrTexture);
+            
+            // Force the GL_RGB16F (16-bit Float) format to preserve HDR brightness values ​​greater than 1.0
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, data); 
+            
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            
+            stbi_image_free(data);
+        } else {
+            std::cerr << "ERROR::HDR::Cannot download the image: " << path << std::endl;
+        }
+        return hdrTexture;
+    }
 }
