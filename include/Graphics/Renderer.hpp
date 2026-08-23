@@ -49,8 +49,9 @@ namespace Graphics {
             bool uiCursorEnabled = false;
             bool tabWasPressed = false;
 
-            // Skybox shader
+            // Skybox shader + equirectangular HDR environment texture
             Shader skyboxShaderProgram;
+            unsigned int hdrTexture;
 
             // Shadow mapping
             unsigned int depthMapFBO;

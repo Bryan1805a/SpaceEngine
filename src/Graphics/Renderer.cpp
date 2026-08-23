@@ -73,6 +73,9 @@ namespace Graphics {
         postProcessor.init(width, height);
         initFramebuffers();
 
+        // Load the HDR environment map used by the skybox
+        hdrTexture = loadHDRTexture("assets/textures/skybox/HDR_multi_nebulae_1.hdr");
+
         // Init ImGui
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
@@ -182,6 +185,7 @@ namespace Graphics {
         glDeleteTextures(1, &depthCubemap);
         glDeleteFramebuffers(2, uiPingpongFBO);
         glDeleteTextures(2, uiPingpongColorbuffers);
+        glDeleteTextures(1, &hdrTexture);
         glDeleteProgram(shaderProgram.ID);
         glDeleteProgram(screenShaderProgram.ID);
         glDeleteProgram(blurShaderProgram.ID);
@@ -283,6 +287,11 @@ namespace Graphics {
         // Draw SKYBOX
         glDepthFunc(GL_LEQUAL);
         skyboxShaderProgram.use();
+
+        // Bind the equirectangular HDR environment map
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, hdrTexture);
+        skyboxShaderProgram.setInt("skybox", 0);
 
         // Remove Translation part of Camera
         glm::mat4 viewNoTranslation = camera.getViewMatrixNoTranslation();
