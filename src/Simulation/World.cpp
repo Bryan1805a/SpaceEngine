@@ -2,6 +2,8 @@
 
 namespace Simulation {
     void World::addBody(const PlanetDesc& desc) {
+        std::string entityName = desc.name.empty() ? ("Object #" + std::to_string(names.size())) : desc.name;
+        names.push_back(entityName);
         masses.push_back(desc.mass);
         positions.push_back(desc.position);
         velocities.push_back(desc.velocity);
@@ -23,6 +25,7 @@ namespace Simulation {
 
         // Swap the last element with the element to be deleted
         size_t lastIdx = masses.size() - 1;
+        names[index] = names[lastIdx];
         masses[index] = masses[lastIdx];
         positions[index] = positions[lastIdx];
         velocities[index] = velocities[lastIdx];
@@ -36,6 +39,7 @@ namespace Simulation {
         radii[index] = radii[lastIdx];
 
         // Pop last index
+        names.pop_back();
         masses.pop_back();
         positions.pop_back();
         velocities.pop_back();

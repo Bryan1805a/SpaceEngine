@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include <string>
 #include <Math/Vector3.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -8,6 +9,7 @@ namespace Simulation {
     enum class BodyType { STAR, ROCKY_PLANET, GAS_GIANT, ICE_MOON, ASTEROID };
 
     struct PlanetDesc {
+        std::string name = "";
         double mass;
         Vector3 position;
         Vector3 velocity;
@@ -22,6 +24,7 @@ namespace Simulation {
     class World {
     public:
         // Set to public to allow systems to easily perform high-speed read/write operations
+        std::vector<std::string> names;
         std::vector<double> masses;
         std::vector<Vector3> positions;
         std::vector<Vector3> velocities;

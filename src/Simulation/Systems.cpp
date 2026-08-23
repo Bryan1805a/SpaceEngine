@@ -93,6 +93,7 @@ namespace Simulation {
                     // Swap and Pop - O(1)
                     size_t lastIdx = world.masses.size() - 1;
 
+                    world.names[j] = world.names[lastIdx];
                     world.masses[j] = world.masses[lastIdx];
                     world.positions[j] = world.positions[lastIdx];
                     world.velocities[j] = world.velocities[lastIdx];
@@ -106,6 +107,7 @@ namespace Simulation {
                     world.radii[j] = world.radii[lastIdx];
 
                     // Delete last index
+                    world.names.pop_back();
                     world.masses.pop_back();
                     world.positions.pop_back();
                     world.velocities.pop_back();

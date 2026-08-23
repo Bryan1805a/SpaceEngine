@@ -32,7 +32,9 @@ namespace Simulation {
 
             // Getter functions that allow graphics components to read the data
             size_t getBodyCount() const { return world.getBodyCount(); }
+            const std::vector<std::string>& getNames() const { return world.names; }
             const std::vector<Vector3>& getPositions() const { return world.positions; }
+            const std::vector<Vector3>& getVelocities() const { return world.velocities; }
             const std::vector<double>& getMasses() const { return world.masses; }
             const std::vector<glm::quat>& getOrientations() const { return world.orientations; }
 
