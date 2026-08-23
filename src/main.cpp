@@ -265,7 +265,7 @@ int main() {
         ImGui::Spacing();
 
         ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.5f, 1.0f), "Navigation Settings");
-        ImGui::SliderFloat("Camera Speed", &renderer.cameraBaseSpeed, 1.0f, 500.0f, "%.1f units/s");
+        ImGui::SliderFloat("Camera Speed", &renderer.getCameraSpeed(), 1.0f, 500.0f, "%.1f units/s");
 
         ImGui::End();
 

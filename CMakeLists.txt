@@ -56,6 +56,9 @@ add_executable(n_body
     include/Simulation/Simulation.hpp
     src/Simulation/Simulation.cpp
     src/Graphics/Renderer.cpp
+    src/Graphics/Shader.cpp
+    src/Graphics/Camera.cpp
+    src/Graphics/Mesh.cpp
     src/Physics/Octree.cpp
 
     # Compiling with ImGui source code

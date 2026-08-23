@@ -5,6 +5,8 @@
 #include <cmath>
 #include <vector>
 #include <Graphics/Renderer.hpp>
+#include <Graphics/Shader.hpp>
+#include <Graphics/Mesh.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -40,20 +42,6 @@ namespace Graphics {
             return;
         }
 
-        // Init default camera status
-        cameraPos = glm::vec3(0.0f, 6.0f, 12.0f);
-        cameraFront = glm::vec3(0.0f, -0.4f, -1.0f);
-        cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
-        yaw = -90.0f;
-        pitch = -22.0f;
-        lastX = width / 2.0f;
-        lastY = height / 2.0f;
-        firstMouse = true;
-        cameraBaseSpeed = 50.0f;
-        lockedTargetIndex = -1;
-        orbitDistance = 20.0f;
-        orbitTheta = 0.0f;
-        orbitPhi = 0.0f;
         // Lock the mouse cursor to the center of the screen and hide it
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
@@ -65,7 +53,7 @@ namespace Graphics {
 
         // Preparing GPU data
         initShaders();
-        initSphere(36, 18);
+        sphere.initSphere(36, 18);
         initFBO();
 
         // Init ImGui
@@ -97,91 +85,11 @@ namespace Graphics {
 
     void Renderer::initShaders() {
         // Load, compile and link each shader program from its source files
-        shaderProgram = loadShaderFromFile("assets/shaders/planet.vert", "assets/shaders/planet.frag");
-        screenShaderProgram = loadShaderFromFile("assets/shaders/screen.vert", "assets/shaders/screen.frag");
-        blurShaderProgram = loadShaderFromFile("assets/shaders/screen.vert", "assets/shaders/blur.frag");
-        skyboxShaderProgram = loadShaderFromFile("assets/shaders/skybox.vert", "assets/shaders/skybox.frag");
-        shadowShaderProgram = loadShaderFromFile("assets/shaders/shadow.vert", "assets/shaders/shadow.frag", "assets/shaders/shadow.geom");
-    }
-
-    void Renderer::initSphere(int sectorCount, int stackCount) {
-        std::vector<float> vertices;
-        std::vector<unsigned int> indices;
-
-        float radius = 1.0f;
-        float sectorStep = 2 * 3.14159265359f / sectorCount;
-        float stackStep = 3.14159265359f / stackCount;
-        float sectorAngle, stackAngle;
-
-        // Generating Vertex Coordinates and Normal Vectors
-        for (int i = 0; i <= stackCount; ++i) {
-            stackAngle = 3.14159265359f / 2 - i * stackStep; // The angle from π/2 to -π/2
-            float xy = radius * std::cos(stackAngle);
-            float z = radius * std::sin(stackAngle);
-
-            for (int j = 0; j <= sectorCount; ++j) {
-                sectorAngle = j * sectorStep; // The angle from 0 to 2*π
-
-                // Vertex coordinates (Position)
-                float x = xy * std::cos(sectorAngle);
-                float y = xy * std::sin(sectorAngle);
-                vertices.push_back(x);
-                vertices.push_back(y);
-                vertices.push_back(z);
-
-                // Normal vector - Used to calculate incident light
-                // For a sphere centered at (0, 0, 0)
-                // The normal vector is simply the normalized vertex coordinates (divided by the radius)
-                vertices.push_back(x / radius);
-                vertices.push_back(y / radius);
-                vertices.push_back(z / radius);
-            }
-        }
-
-        // Generate indices to connect vertices into triangles
-        for (int i = 0; i < stackCount; ++i) {
-            int k1 = i * (sectorCount + 1); // Head of current parallel
-            int k2 = k1 + sectorCount + 1; // Head of next parallel
-
-            for (int j = 0; j < sectorCount; ++j, ++k1, ++k2) {
-                if (i != 0) {
-                    indices.push_back(k1);
-                    indices.push_back(k2);
-                    indices.push_back(k1 + 1);
-                }
-                if (i != (stackCount - 1)) {
-                    indices.push_back(k1 + 1);
-                    indices.push_back(k2);
-                    indices.push_back(k2 + 1);
-                }
-            }
-        }
-        indexCount = indices.size();
-
-        // Load data to VRAM (Including EBO)
-        unsigned int EBO;
-        glGenVertexArrays(1, &VAO);
-        glGenBuffers(1, &VBO);
-        glGenBuffers(1, &EBO); // Element Buffer Object is used to store an array of indices
-
-        glBindVertexArray(VAO);
-
-        glBindBuffer(GL_ARRAY_BUFFER, VBO);
-        glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), indices.data(), GL_STATIC_DRAW);
-
-        // Declare how to read VBO
-        // Now each vertex has 6 real numbers: 3 Coordinates + 3 Normals
-        int stride = 6 * sizeof(float);
-        // Attribute 0: Coordinates (aPos)
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)0);
-        glEnableVertexAttribArray(0);
-        // Attribute 1: aNormal - Shift by 3 floats
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void*)(3 * sizeof(float)));
-        glEnableVertexAttribArray(1);
-
-        glBindVertexArray(0);
+        shaderProgram = Shader("assets/shaders/planet.vert", "assets/shaders/planet.frag");
+        screenShaderProgram = Shader("assets/shaders/screen.vert", "assets/shaders/screen.frag");
+        blurShaderProgram = Shader("assets/shaders/screen.vert", "assets/shaders/blur.frag");
+        skyboxShaderProgram = Shader("assets/shaders/skybox.vert", "assets/shaders/skybox.frag");
+        shadowShaderProgram = Shader("assets/shaders/shadow.vert", "assets/shaders/shadow.frag", "assets/shaders/shadow.geom");
     }
 
     Renderer::~Renderer() {
@@ -191,11 +99,13 @@ namespace Graphics {
         ImGui::DestroyContext();
 
         // Clean CPU resources before closing window
-        glDeleteVertexArrays(1, &VAO);
-        glDeleteBuffers(1, &VBO);
-        glDeleteProgram(shaderProgram);
-        glDeleteProgram(screenShaderProgram);
-        glDeleteProgram(blurShaderProgram);
+        sphere.cleanup();
+        quad.cleanup();
+        glDeleteProgram(shaderProgram.ID);
+        glDeleteProgram(screenShaderProgram.ID);
+        glDeleteProgram(blurShaderProgram.ID);
+        glDeleteProgram(skyboxShaderProgram.ID);
+        glDeleteProgram(shadowShaderProgram.ID);
 
         if (window) {
             glfwDestroyWindow(window);
@@ -238,15 +148,14 @@ namespace Graphics {
         glViewport(0, 0, SHADOW_RES, SHADOW_RES);
         glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
         glClear(GL_DEPTH_BUFFER_BIT);
-        glUseProgram(shadowShaderProgram);
-        glBindVertexArray(VAO);
+        shadowShaderProgram.use();
 
         for (unsigned int i = 0; i < 6; ++i) {
-            glUniformMatrix4fv(glGetUniformLocation(shadowShaderProgram, ("shadowMatrices[" + std::to_string(i) + "]").c_str()), 1, GL_FALSE, glm::value_ptr(shadowTransforms[i]));
+            shadowShaderProgram.setMat4("shadowMatrices[" + std::to_string(i) + "]", shadowTransforms[i]);
         }
 
-        glUniform1f(glGetUniformLocation(shadowShaderProgram, "far_plane"), far_plane);
-        glUniform3f(glGetUniformLocation(shadowShaderProgram, "lightPos"), lightPos.x, lightPos.y, lightPos.z);
+        shadowShaderProgram.setFloat("far_plane", far_plane);
+        shadowShaderProgram.setVec3("lightPos", lightPos);
 
         // Drawing loop
         for (size_t i = 1; i < count; ++i) { // Exclude the Sun (i=0) because the Sun does not cast a shadow on itself
@@ -255,8 +164,8 @@ namespace Graphics {
             float radius = (float)radii[i];
             model = glm::translate(glm::mat4(1.0f), pos) * glm::mat4_cast(orientations[i]) * glm::scale(glm::mat4(1.0f), glm::vec3(radius));
 
-            glUniformMatrix4fv(glGetUniformLocation(shadowShaderProgram, "model"), 1, GL_FALSE, glm::value_ptr(model));
-            glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, 0);
+            shadowShaderProgram.setMat4("model", model);
+            sphere.draw();
         }
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glViewport(0, 0, width, height);
@@ -268,65 +177,50 @@ namespace Graphics {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
         // Activate Shader Program
-        glUseProgram(shaderProgram);
+        shaderProgram.use();
         glActiveTexture(GL_TEXTURE2);
         glBindTexture(GL_TEXTURE_CUBE_MAP, depthCubemap);
-        glUniform1i(glGetUniformLocation(shaderProgram, "depthMap"), 2);
-        glUniform1f(glGetUniformLocation(shaderProgram, "far_plane"), far_plane);
+        shaderProgram.setInt("depthMap", 2);
+        shaderProgram.setFloat("far_plane", far_plane);
 
         // Setup CAMERA and SPACE
 
         // Projection Matrix
         // Creates a perspective effect (45 FOV, view range from 0.1 to 1000.0)
         glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)width / (float)height, 0.1f, 1000.0f);
-        int projLoc = glGetUniformLocation(shaderProgram, "projection");
-        glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
+        shaderProgram.setMat4("projection", projection);
 
         // View Matrix
-        // Position the camera high up (Y=150) and set it back (Z=300)
-        // Point the camera direcly down at the origin (0, 0, 0)
-        glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
-        int viewLoc = glGetUniformLocation(shaderProgram, "view");
-        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
+        glm::mat4 view = camera.getViewMatrix();
+        shaderProgram.setMat4("view", view);
 
         // Send camera position to the atmospheric (Fresnel) shader
-        int viewPosLoc = glGetUniformLocation(shaderProgram, "viewPos");
-        glUniform3f(viewPosLoc, cameraPos.x, cameraPos.y, cameraPos.z);
+        shaderProgram.setVec3("viewPos", camera.Position);
 
         // // Send light source position (Fixed at the Star - position 0)
-        int lightPosLoc = glGetUniformLocation(shaderProgram, "lightPos");
         if (count > 0) {
-            glUniform3f(lightPosLoc, (float)positions[0].x, (float)positions[0].y, (float)positions[0].z);
+            shaderProgram.setVec3("lightPos", (float)positions[0].x, (float)positions[0].y, (float)positions[0].z);
         }
-
-        int typeLoc = glGetUniformLocation(shaderProgram, "bodyType");
-        int tempLoc = glGetUniformLocation(shaderProgram, "temperature");
 
         // Draw SKYBOX
         glDepthFunc(GL_LEQUAL);
-        glUseProgram(skyboxShaderProgram);
+        skyboxShaderProgram.use();
 
         // Remove Translation part of Camera
-        glm::mat4 viewNoTranslation = glm::mat4(glm::mat3(view));
+        glm::mat4 viewNoTranslation = camera.getViewMatrixNoTranslation();
 
         // Inverse matrix
-        glUniformMatrix4fv(glGetUniformLocation(skyboxShaderProgram, "invProjection"), 1, GL_FALSE, glm::value_ptr(glm::inverse(projection)));
-        glUniformMatrix4fv(glGetUniformLocation(skyboxShaderProgram, "invView"), 1, GL_FALSE, glm::value_ptr(glm::inverse(viewNoTranslation)));
+        skyboxShaderProgram.setMat4("invProjection", glm::inverse(projection));
+        skyboxShaderProgram.setMat4("invView", glm::inverse(viewNoTranslation));
 
-        glBindVertexArray(quadVAO);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
+        quad.draw();
 
         glDepthFunc(GL_LESS);
 
         // Switch back to the main planet shader before drawing the bodies
-        glUseProgram(shaderProgram);
+        shaderProgram.use();
 
         // Drawing objects
-        // Bind the VAO again to let the GPU know we are about to use the cube's vertex data
-        glBindVertexArray(VAO);
-
-        int modeLoc = glGetUniformLocation(shaderProgram, "model");
-
         for (size_t i = 0; i < count; ++i) {
             glm::mat4 model = glm::mat4(1.0f); 
             glm::vec3 pos((float)positions[i].x, (float)positions[i].y, (float)positions[i].z);
@@ -345,14 +239,14 @@ namespace Graphics {
             model = translation * rotation * scale;
 
             // Send the object types and temperature to the GPU
-            glUniform1i(typeLoc, static_cast<int>(types[i]));
-            glUniform1f(tempLoc, (float)temperatures[i]);
+            shaderProgram.setInt("bodyType", static_cast<int>(types[i]));
+            shaderProgram.setFloat("temperature", (float)temperatures[i]);
 
             // Send this object's own model matrix to the GPU
-            glUniformMatrix4fv(modeLoc, 1, GL_FALSE, glm::value_ptr(model));
+            shaderProgram.setMat4("model", model);
 
-            // Draw command: Drawing 36 vertices from VBO (Forming a cube)
-            glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, 0);
+            // Draw the sphere mesh
+            sphere.draw();
         }
 
         // Appy Gaussian Blur
@@ -360,19 +254,18 @@ namespace Graphics {
         unsigned int amount = 10;
 
         glActiveTexture(GL_TEXTURE0);
-        glUseProgram(blurShaderProgram);
-        glUniform1i(glGetUniformLocation(blurShaderProgram, "image"), 0);
+        blurShaderProgram.use();
+        blurShaderProgram.setInt("image", 0);
         float weights[5] = { 0.227027f, 0.1945946f, 0.1216216f, 0.054054f, 0.016216f };
-        glUniform1fv(glGetUniformLocation(blurShaderProgram, "weight"), 5, weights);
+        blurShaderProgram.setFloatArray("weight", weights, 5);
         for (unsigned int i = 0; i < amount; i++) {
             glBindFramebuffer(GL_FRAMEBUFFER, pingpongFBO[horizontal]);
-            glUniform1i(glGetUniformLocation(blurShaderProgram, "horizontal"), horizontal);
+            blurShaderProgram.setBool("horizontal", horizontal);
 
             // Get image from main FBO
             glBindTexture(GL_TEXTURE_2D, first_iteration ? textureColorbuffer : pingpongColorbuffers[!horizontal]);
 
-            glBindVertexArray(quadVAO);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
+            quad.draw();
 
             horizontal = !horizontal;
             if (first_iteration) {
@@ -385,15 +278,14 @@ namespace Graphics {
         bool first_iteration_bloom = true;
         unsigned int amount_bloom = 15;
 
-        glUseProgram(blurShaderProgram);
+        blurShaderProgram.use();
         for (unsigned int i = 0; i < amount_bloom; i++) {
             glBindFramebuffer(GL_FRAMEBUFFER, pingpongFBO_Bloom[horizontal_bloom]);
-            glUniform1i(glGetUniformLocation(blurShaderProgram, "horizontal"), horizontal_bloom);
+            blurShaderProgram.setBool("horizontal", horizontal_bloom);
 
             glBindTexture(GL_TEXTURE_2D, first_iteration_bloom ? textureBloombuffer : pingpongColorbuffers_Bloom[!horizontal_bloom]);
 
-            glBindVertexArray(quadVAO);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
+            quad.draw();
 
             horizontal_bloom = !horizontal_bloom;
             if (first_iteration_bloom) {
@@ -406,20 +298,19 @@ namespace Graphics {
         glDisable(GL_DEPTH_TEST);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        glUseProgram(screenShaderProgram);
+        screenShaderProgram.use();
 
         // Assign the scenery texture to Slot 0
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, textureColorbuffer);
-        glUniform1i(glGetUniformLocation(screenShaderProgram, "screenTexture"), 0);
+        screenShaderProgram.setInt("screenTexture", 0);
 
         // Attach the blurred bloom texture to Slot 1
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, pingpongColorbuffers_Bloom[!horizontal_bloom]);
-        glUniform1i(glGetUniformLocation(screenShaderProgram, "bloomBlur"), 1);
+        screenShaderProgram.setInt("bloomBlur", 1);
         
-        glBindVertexArray(quadVAO);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
+        quad.draw();
 
         // Unbind VAO after drawing is complete
         glBindVertexArray(0);
@@ -436,104 +327,8 @@ namespace Graphics {
             glfwSetWindowShouldClose(window, true);
         }
 
-        // Unlock mouse cursor while holding Left Alt, re-lock on release
-        if (glfwGetKey(window, GLFW_KEY_LEFT_ALT) == GLFW_PRESS) {
-            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-            firstMouse = true; // Prevent camera jitter when hiding the mouse cursor
-        }
-        else {
-            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-        }
-        
-        // Mode 1: Lock Target
-        // Camera follow plantary orbit
-        if (lockedTargetIndex != -1) {
-            // W,S to narrow or widen the viewing distance
-            float zoomSpeed = cameraBaseSpeed * 0.5f * deltaTime;
-            if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
-                orbitDistance -= zoomSpeed;
-            }
-            if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
-                orbitDistance += zoomSpeed;
-            }
-            if (orbitDistance < 2.0f) {
-                orbitDistance = 2.0f;
-            }
-            if (orbitDistance > 500.0f) {
-                orbitDistance = 500.0f;
-            }
-
-            // If left Alt is not pressed
-            if (!(glfwGetKey(window, GLFW_KEY_LEFT_ALT) == GLFW_PRESS)) {
-                double xpos, ypos;
-
-                glfwGetCursorPos(window, &xpos, &ypos);
-                if (firstMouse) {
-                    lastX = (float)xpos;
-                    lastY = (float)ypos;
-                    firstMouse = false;
-                }
-
-                float xoffset = (float)xpos - lastX;
-                float yoffset = (float)ypos - lastY;
-                lastX = (float)xpos;
-                lastY = (float)ypos;
-
-                float sensitivity = 0.005f;
-                orbitTheta += xoffset * sensitivity;
-                orbitPhi += yoffset * sensitivity;
-
-                // Lock the tilt angle to prevent the camera from flipping over
-                if (orbitPhi > 1.5f) orbitPhi = 1.5f;
-                if (orbitPhi < -1.5f) orbitPhi = -1.5f;
-            }
-        }
-
-        // Mode 2
-        // Free-Fly
-        else {
-            float moveSpeed = cameraBaseSpeed * deltaTime;
-            if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
-                cameraPos += moveSpeed * cameraFront;
-            }
-            if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
-                cameraPos -= moveSpeed * cameraFront;
-            }
-            if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
-                cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * moveSpeed;
-            }
-            if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
-                cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * moveSpeed;
-            }
-
-            if (!(glfwGetKey(window, GLFW_KEY_LEFT_ALT) == GLFW_PRESS)) {
-                double xpos, ypos;
-                glfwGetCursorPos(window, &xpos, &ypos);
-                if (firstMouse) {
-                    lastX = (float)xpos;
-                    lastY = (float)ypos;
-                    firstMouse = false;
-                }
-
-                float xoffset = (float)xpos - lastX;
-                float yoffset = lastY - (float)ypos;
-                lastX = (float)xpos;
-                lastY = (float)ypos;
-
-                float sensitivity = 0.1f;
-                yaw += xoffset * sensitivity;
-                pitch += yoffset * sensitivity;
-                if (pitch > 89.0f) pitch = 89.0f;
-                if (pitch < -89.0f) pitch = -89.0f;
-
-                glm::vec3 front;
-                front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
-                front.y = sin(glm::radians(pitch));
-                front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
-                cameraFront = glm::normalize(front);
-            }
-        }
-        
+        // Camera movement and rotation (free-fly or orbit)
+        camera.processInput(window, deltaTime);
     }
 
     void Renderer::beginUI() const {
@@ -559,7 +354,7 @@ namespace Graphics {
         ray_eye = glm::vec4(ray_eye.x, ray_eye.y, -1.0f, 0.0f); // Set w=0 to turn it into a direction vector
 
         // View Space to World Space
-        glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
+        glm::mat4 view = camera.getViewMatrix();
         glm::vec3 ray_wor = glm::vec3(glm::inverse(view) * ray_eye);
 
         // Returns the normalized direction vector
@@ -626,24 +421,7 @@ namespace Graphics {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
         // Init Screen Quad
-        float quadVertices[] = {
-            // Coordinates (X, Y)   // Texture Coordinate (U, V)
-            -1.0f,  1.0f,           0.0f, 1.0f,
-            -1.0f, -1.0f,           0.0f, 0.0f,
-             1.0f, -1.0f,           1.0f, 0.0f,
-            -1.0f,  1.0f,           0.0f, 1.0f,
-             1.0f, -1.0f,           1.0f, 0.0f,
-             1.0f,  1.0f,           1.0f, 1.0f
-        };
-        glGenVertexArrays(1, &quadVAO);
-        glGenBuffers(1, &quadVBO);
-        glBindVertexArray(quadVAO);
-        glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-        glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+        quad.initQuad();
 
         // Init Ping Pong FBOs for Gaussian Blur
         glGenFramebuffers(2, pingpongFBO);
@@ -675,132 +453,19 @@ namespace Graphics {
     }
 
     void Renderer::lockTarget(int entityIndex, float distance) {
-        lockedTargetIndex = entityIndex;
-        orbitDistance = distance;
-        orbitTheta = 0.0f;
-        orbitPhi = 0.0f;
+        camera.lockTarget(entityIndex, distance);
 
         // When locking onto a target, hide the cursor to use the mouse for rotating the camera orbit
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-        firstMouse = true;
     }
 
     void Renderer::unlockTarget() {
-        lockedTargetIndex = -1;
+        camera.unlockTarget();
     }
 
     void Renderer::updateCameraTracking(const std::vector<Vector3>& positions) {
-        if (lockedTargetIndex != -1 && static_cast<size_t>(lockedTargetIndex) < positions.size()) {
-            Vector3 target = positions[lockedTargetIndex];
-            glm::vec3 targetPos((float)target.x, (float)target.y, (float)target.z);
-
-            // Use trigonometry to convert spherical coordinates (orbitTheta, orbitPhi, orbitDistance) into Cartesian coordinates (X, Y, Z)
-            float camX = orbitDistance * cos(orbitPhi) * cos(orbitTheta);
-            float camY = orbitDistance * sin(orbitPhi);
-            float camZ = orbitDistance * cos(orbitPhi) * sin(orbitTheta);
-
-            // Lock the camera onto the target
-            cameraPos = targetPos + glm::vec3(camX, camY, camZ);
-
-            // Force the camera to keep its view (front) aimed directly at the center of the target
-            cameraFront = glm::normalize(targetPos - cameraPos);
-        }
+        camera.updateTracking(positions);
     }
 
-    unsigned int Renderer::loadShaderFromFile(const char* vertexPath, const char* fragmentPath, const char* geometryPath) {
-        std::string vertexCode;
-        std::string fragmentCode;
-        std::ifstream vShaderFile;
-        std::ifstream fShaderFile;
-
-        vShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-        fShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-
-        try {
-            vShaderFile.open(vertexPath);
-            fShaderFile.open(fragmentPath);
-            std::stringstream vShaderStream, fShaderStream;
-
-            // Read file content
-            vShaderStream << vShaderFile.rdbuf();
-            fShaderStream << fShaderFile.rdbuf();
-            // Close file
-            vShaderFile.close();
-            fShaderFile.close();
-            // Convert stream to string
-            vertexCode = vShaderStream.str();
-            fragmentCode = fShaderStream.str();
-        } catch (std::ifstream::failure& e) {
-            std::cerr << "ERROR::SHADER::FILE_NOT_SUCCESFULLY_READ: " << vertexPath << " or " << fragmentPath << std::endl;
-        }
-
-        const char* vShaderCode = vertexCode.c_str();
-        const char* fShaderCode = fragmentCode.c_str();
-
-        unsigned int vertex, fragment;
-        int success;
-        char infoLog[512];
-
-        // Compile Vertex Shader
-        vertex = glCreateShader(GL_VERTEX_SHADER);
-        glShaderSource(vertex, 1, &vShaderCode, NULL);
-        glCompileShader(vertex);
-        glGetShaderiv(vertex, GL_COMPILE_STATUS, &success);
-        if (!success) {
-            glGetShaderInfoLog(vertex, 512, NULL, infoLog);
-            std::cerr << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog << std::endl;
-        }
-
-        // Compile Fragment Shader
-        fragment = glCreateShader(GL_FRAGMENT_SHADER);
-        glShaderSource(fragment, 1, &fShaderCode, NULL);
-        glCompileShader(fragment);
-        glGetShaderiv(fragment, GL_COMPILE_STATUS, &success);
-        if (!success) {
-            glGetShaderInfoLog(fragment, 512, NULL, infoLog);
-            std::cerr << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n" << infoLog << std::endl;
-        }
-
-        // Compile Geometry Shader
-        unsigned int geometry = 0;
-        if (geometryPath != nullptr) {
-            std::string geometryCode;
-            std::ifstream gShaderFile;
-            gShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-            try {
-                gShaderFile.open(geometryPath);
-                std::stringstream gShaderStream;
-                gShaderStream << gShaderFile.rdbuf();
-                gShaderFile.close();
-                geometryCode = gShaderStream.str();
-            } catch (std::ifstream::failure& e) {
-                std::cerr << "ERROR::SHADER::FILE_NOT_SUCCESSFULLY_READ: " << geometryPath << std::endl;
-            }
-            const char* gShaderCode = geometryCode.c_str();
-            geometry = glCreateShader(GL_GEOMETRY_SHADER);
-            glShaderSource(geometry, 1, &gShaderCode, NULL);
-            glCompileShader(geometry);
-        }
-
-        // Link Shader Program
-        unsigned int ID = glCreateProgram();
-        glAttachShader(ID, vertex);
-        glAttachShader(ID, fragment);
-        if (geometryPath != nullptr) {
-            glAttachShader(ID, geometry);
-        }
-        glLinkProgram(ID);
-        glGetProgramiv(ID, GL_LINK_STATUS, &success);
-        if (!success) {
-            glGetProgramInfoLog(ID, 512, NULL, infoLog);
-            std::cerr << "ERROR::SHADER::PROGRAM::LINKING_FAILED\n" << infoLog << std::endl;
-        }
-
-        // Clean trash
-        glDeleteShader(vertex);
-        glDeleteShader(fragment);
-        if (geometryPath != nullptr) glDeleteShader(geometry);
-
-        return ID;
-    }
+    
 }
