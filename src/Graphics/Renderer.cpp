@@ -281,8 +281,36 @@ namespace Graphics {
         postProcessor.renderToScreen(screenShaderProgram, quad);
     }
 
-    void Renderer::pollEvents() const {
+    void Renderer::pollEvents() {
         glfwPollEvents();
+
+        // Detect resolution changes (window drag, maximize, etc.)
+        int fbWidth, fbHeight;
+        glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
+        if (fbWidth != width || fbHeight != height) {
+            resize(fbWidth, fbHeight);
+        }
+    }
+
+    void Renderer::resize(int newWidth, int newHeight) {
+        if (newWidth <= 0 || newHeight <= 0) return; // Ignore minimized window
+        if (newWidth == width && newHeight == height) return;
+
+        width = newWidth;
+        height = newHeight;
+
+        // Re-allocate the off-screen scene/bloom buffers
+        postProcessor.resize(width, height);
+
+        // Re-allocate the UI frosted-glass blur buffers (textures stay attached)
+        for (unsigned int i = 0; i < 2; i++) {
+            glBindTexture(GL_TEXTURE_2D, uiPingpongColorbuffers[i]);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+        }
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+        // Keep the OpenGL viewport in sync with the new size
+        glViewport(0, 0, width, height);
     }
 
     void Renderer::processInput(float deltaTime) {

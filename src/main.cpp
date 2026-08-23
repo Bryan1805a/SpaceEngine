@@ -97,6 +97,7 @@ int main() {
     Graphics::Renderer renderer(1280, 720, "SpaceEngine");
     std::cout << "Initialised 1000 asteroids" << std::endl;
     std::cout << "Press X to quit" << std::endl;
+    std::cout << "Press F11 to toggle fullscreen" << std::endl;
 
     // Delta Time vars
     float deltaTime = 0.0f;
@@ -138,7 +139,7 @@ int main() {
         // Get the current coordinates and dimensions of the UI window
         ImVec2 winPos = ImGui::GetWindowPos();
         ImVec2 winSize = ImGui::GetWindowSize();
-        ImVec2 screenRes = ImVec2(1280.0f, 720.0f); // Display resolution
+        ImVec2 screenRes = ImVec2((float)renderer.getWidth(), (float)renderer.getHeight()); // Display resolution
 
         // UV Calculation
         ImVec2 uv0 = ImVec2(winPos.x / screenRes.x, winPos.y / screenRes.y);

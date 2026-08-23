@@ -59,7 +59,13 @@ namespace Graphics {
             bool shouldClose() const;
             void clear() const;
             void swapBuffers() const;
-            void pollEvents() const;
+            void pollEvents();
+
+            // Re-create FBOs when the window resolution changes
+            void resize(int newWidth, int newHeight);
+
+            int getWidth() const {return width;}
+            int getHeight() const {return height;}
 
             void draw(size_t count,
                       const std::vector<Vector3>& positions,
