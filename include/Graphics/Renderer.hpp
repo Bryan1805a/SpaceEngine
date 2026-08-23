@@ -45,6 +45,10 @@ namespace Graphics {
             int windowedX = 0, windowedY = 0;
             int windowedWidth = 0, windowedHeight = 0;
 
+            // Persistent UI-cursor toggle state (Tab)
+            bool uiCursorEnabled = false;
+            bool tabWasPressed = false;
+
             // Skybox shader
             Shader skyboxShaderProgram;
 
@@ -88,6 +92,8 @@ namespace Graphics {
             // Get camera data for UI
             glm::vec3 getCameraPos() const {return camera.Position;}
             glm::vec3 getCameraFront() const {return camera.Front;}
+            float getCameraYaw() const {return camera.Yaw;}
+            float getCameraPitch() const {return camera.Pitch;}
 
             // API for Camera Tracking
             float& getCameraSpeed() {return camera.MovementSpeed;}
@@ -102,6 +108,9 @@ namespace Graphics {
 
             // Declare a function to calculate the ray direction
             glm::vec3 getRayDirection(float mouseX, float mouseY) const;
+
+            // Project 3D world coordinate to 2D screen coordinate for HUD reticles
+            bool worldToScreen(const glm::vec3& worldPos, glm::vec2& outScreenPos, float& outDist) const;
 
             unsigned int getBlurredTexture() const { return uiPingpongColorbuffers[0]; }
     };

@@ -1,5 +1,7 @@
 #include <iostream>
 #include <cmath>
+#include <string>
+#include <ctime>
 #include <imgui.h>
 #include <Math/Vector3.hpp>
 #include <Simulation/Simulation.hpp>
@@ -43,6 +45,28 @@ const char* bodyTypeName(Simulation::BodyType type) {
     }
 }
 
+// EVE-style accent colour per body type
+ImVec4 bodyTypeColor(Simulation::BodyType type) {
+    switch (type) {
+        case Simulation::BodyType::STAR: return ImVec4(1.00f, 0.80f, 0.30f, 1.0f);
+        case Simulation::BodyType::ROCKY_PLANET: return ImVec4(0.60f, 0.80f, 0.90f, 1.0f);
+        case Simulation::BodyType::GAS_GIANT: return ImVec4(0.55f, 0.85f, 0.70f, 1.0f);
+        case Simulation::BodyType::ICE_MOON: return ImVec4(0.70f, 0.85f, 1.00f, 1.0f);
+        case Simulation::BodyType::ASTEROID: return ImVec4(0.55f, 0.55f, 0.60f, 1.0f);
+        default: return ImVec4(0.70f, 0.70f, 0.70f, 1.0f);
+    }
+}
+
+// World units are AU. 1 AU ~= 1.496e8 km.
+std::string formatDistance(double au) {
+    if (au < 0.001) {
+        return std::to_string(au * 1.496e8).substr(0, 6) + " km";
+    }
+    char buf[64];
+    snprintf(buf, sizeof(buf), "%.3f AU", au);
+    return buf;
+}
+
 int main() {
     // Reference frame:
     // G = 0.000118549 (AU^3 / (M_earth * Year^2))
@@ -51,6 +75,7 @@ int main() {
 
     // Init Sun
     Simulation::PlanetDesc sun;
+    sun.name = "Sol";
     sun.type = Simulation::BodyType::STAR;
     sun.mass = 333000.0;
     sun.position = Vector3::Zero;
@@ -61,6 +86,7 @@ int main() {
 
     // Init Earth
     Simulation::PlanetDesc earth;
+    earth.name = "Earth";
     earth.type = Simulation::BodyType::ROCKY_PLANET;
     earth.mass = 1.0;
     earth.position = Vector3(1.0, 0.0, 0.0); // At a distance of 1 AU from the Sun
@@ -70,9 +96,10 @@ int main() {
     earth.greenhouse = 1.13; // 255K -> 288K
     earth.radius = 0.04;
     sim.addBody(earth);
-    
+
     // Init Mars
     Simulation::PlanetDesc mars;
+    mars.name = "Mars";
     mars.type = Simulation::BodyType::ROCKY_PLANET;
     mars.mass = 0.107;
     mars.position = Vector3(1.524, 0.0, 0.0);
@@ -84,6 +111,7 @@ int main() {
 
     // Init Jupiter
     Simulation::PlanetDesc jupiter;
+    jupiter.name = "Jupiter";
     jupiter.type = Simulation::BodyType::GAS_GIANT;
     jupiter.mass = 317.8;
     jupiter.position = Vector3(5.204, 0.0, 0.0);
@@ -98,6 +126,7 @@ int main() {
     std::cout << "Initialised 1000 asteroids" << std::endl;
     std::cout << "Press X to quit" << std::endl;
     std::cout << "Press F11 to toggle fullscreen" << std::endl;
+    std::cout << "Press TAB to toggle the UI cursor (or hold ALT while flying)" << std::endl;
 
     // Delta Time vars
     float deltaTime = 0.0f;
@@ -107,6 +136,12 @@ int main() {
     float timeScale = 1.0f;         // Time speed
     float shootSpeed = 300.0f;      // Lauch velocity
     const double baseDt = 0.001;    // Base time step (~0.365 days)
+
+    bool showOverview = true;
+    bool showSelected = false;
+    bool showNav = true;
+    bool showSystemInfo = true;
+    bool showHud = true;
 
     // Main loop
     int selectedEntity = -1;
@@ -135,144 +170,343 @@ int main() {
         // Draw UI
         renderer.beginUI();
 
-        ImGui::Begin("Space Engine Control Panel");
-        // Get the current coordinates and dimensions of the UI window
-        ImVec2 winPos = ImGui::GetWindowPos();
-        ImVec2 winSize = ImGui::GetWindowSize();
-        ImVec2 screenRes = ImVec2((float)renderer.getWidth(), (float)renderer.getHeight()); // Display resolution
+        float dt = ImGui::GetIO().DeltaTime;
+        (void)dt;
 
-        // UV Calculation
-        ImVec2 uv0 = ImVec2(winPos.x / screenRes.x, winPos.y / screenRes.y);
-        ImVec2 uv1 = ImVec2((winPos.x + winSize.x) / screenRes.x, (winPos.y + winSize.y) / screenRes.y);
+        const std::vector<std::string>& bNames = sim.getNames();
+        const std::vector<Vector3>& bPos = sim.getPositions();
+        const std::vector<Vector3>& bVel = sim.getVelocities();
+        const std::vector<double>& bMass = sim.getMasses();
+        const std::vector<double>& bRadii = sim.getRadii();
+        const std::vector<double>& bTemp = sim.getTemperatures();
+        const std::vector<Simulation::BodyType>& bTypes = sim.getTypes();
 
-        // Invert Y-axis
-        uv0.y = 1.0f - uv0.y;
-        uv1.y = 1.0f - uv1.y;
-        std::swap(uv0.y, uv1.y);
+        // ============  LEFT NEOCOM DOCK  ============
+        {
+            ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
+            ImGui::SetNextWindowSize(ImVec2(52, (float)renderer.getHeight()), ImGuiCond_Always);
+            ImGui::Begin("##neocom", nullptr,
+                         ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                         ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
+                         ImGuiWindowFlags_NoBringToFrontOnFocus);
 
-        // Apply blur glass effect
-        ImGui::GetWindowDrawList()->AddImage(
-            (void*)(intptr_t)renderer.getBlurredTexture(),
-            winPos,
-            ImVec2(winPos.x + winSize.x, winPos.y + winSize.y),
-            uv0, uv1
-        );
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.10f, 0.22f, 0.30f, 0.90f));
 
-        // Add an ultra-thin gray/black overlay (Alpha = 0.2) 
-        // over the frosted glass to make the text easier to read
-        ImGui::GetWindowDrawList()->AddRectFilled(
-            winPos, ImVec2(winPos.x + winSize.x, winPos.y + winSize.y),
-            IM_COL32(10, 10, 10, 50)
-        );
+            // Top: system / menu icon
+            if (ImGui::Button("☰", ImVec2(36, 30))) showSystemInfo = !showSystemInfo;
+            ImGui::Dummy(ImVec2(0, 8));
 
-        ImGui::Text("Performance: %.1f FPS", ImGui::GetIO().Framerate);
-        ImGui::Text("Active Entities: %zu", sim.getBodyCount());
+            if (ImGui::Button("◉", ImVec2(36, 30))) { showOverview = !showOverview; }
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Overview (O)");
+            ImGui::Dummy(ImVec2(0, 4));
 
-        ImGui::Spacing();
-        ImGui::Separator();
-        ImGui::Spacing();
+            if (ImGui::Button("◎", ImVec2(36, 30))) { showSelected = !showSelected; }
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Selected Item");
+            ImGui::Dummy(ImVec2(0, 4));
 
-        // Module 1: Time Control
-        ImGui::TextColored(ImVec4(0.5f, 0.8f, 1.0f, 1.0f), "Time Control");
-        // Slider from 0.0x (Freeze frame) to 5.0x (Fast-forward)
-        ImGui::SliderFloat("Time Scale", &timeScale, 0.0f, 5.0f, "%.2fx");
-        if (ImGui::Button("Reset Time")) {
-            timeScale = 1.0f;
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Pause")) {
-            timeScale = 0.0f;
-        }
+            if (ImGui::Button("➤", ImVec2(36, 30))) { showNav = !showNav; }
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Navigation / Time");
+            ImGui::Dummy(ImVec2(0, 4));
 
-        ImGui::Spacing();
-        ImGui::Separator();
-        ImGui::Spacing();
+            if (ImGui::Button("◎", ImVec2(36, 30))) { showHud = !showHud; }
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Tactical HUD");
 
-        // Module 2: Entity spawner
-        if (ImGui::Button("Shoot Planet / Black Hole!")) {
-            // Get coordinates and viewing direction from the camera
-            glm::vec3 camPos = renderer.getCameraPos();
-            glm::vec3 camFront = renderer.getCameraFront();
+            ImGui::PopStyleColor(2);
 
-            Vector3 pos(camPos.x, camPos.y, camPos.z);
-            // Lauch velocity = Direction * Speed
-            Vector3 vel(camFront.x * shootSpeed, camFront.y * shootSpeed, camFront.z * shootSpeed);
-
-            // Init Black Hole
-            Simulation::PlanetDesc blackhole;
-            blackhole.type = Simulation::BodyType::STAR;
-            blackhole.mass = 5000;
-            blackhole.position = pos;
-            blackhole.velocity = vel;
-            blackhole.radius = 0.20;
-
-            // Load the new celestial body into the SoA system
-            sim.addBody(blackhole);
-        }
-
-        // Module 3: Interacting via Raycasting
-        // Planets can only be selected by clicking while holding the ALT key (mouse unlocked)
-        if (glfwGetKey(renderer.getWindow(), GLFW_KEY_LEFT_ALT) == GLFW_PRESS) {
-            // Check for left mouse clicks
-            // and ensure the mouse does not accidentally click on ImGui windows
-            if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::IsAnyItemHovered()) {
-                ImVec2 mousePos = ImGui::GetMousePos();
-                glm::vec3 rayDir = renderer.getRayDirection(mousePos.x, mousePos.y);
-
-                // Lauch laser ray into space
-                selectedEntity = raycast(renderer.getCameraPos(), rayDir, sim.getPositions(), sim.getRadii());
-            }
-        }
-
-        // If a planet is currently selected, display the detailed information panel
-        if (selectedEntity != -1 && selectedEntity < sim.getBodyCount()) {
-            ImGui::Spacing();
+            // Bottom: system clock
+            ImGui::Dummy(ImVec2(0, 10));
             ImGui::Separator();
+            ImGui::Dummy(ImVec2(0, 8));
+
+            time_t now = time(nullptr);
+            struct tm tmbuf;
+            localtime_s(&tmbuf, &now);
+            char clockStr[16];
+            strftime(clockStr, sizeof(clockStr), "%H:%M", &tmbuf);
+
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.35f, 0.75f, 0.95f, 1.0f));
+            ImGui::SetCursorPosX(8);
+            ImGui::Text("%s", clockStr);
+            ImGui::PopStyleColor();
+
+            ImGui::End();
+        }
+
+        // ============  SYSTEM INFO (top-left)  ============
+        if (showSystemInfo) {
+            ImGui::SetNextWindowPos(ImVec2(62, 8), ImGuiCond_FirstUseEver);
+            ImGui::SetNextWindowSize(ImVec2(270, 0), ImGuiCond_FirstUseEver);
+            ImGui::Begin("Solar System // Sol", nullptr,
+                         ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize);
+
+            ImGui::TextColored(ImVec4(0.35f, 0.80f, 1.00f, 1.0f), "Jita IV - Moon 6 - General");
+            ImGui::Separator();
+            ImGui::Text("Bodies: %zu", sim.getBodyCount());
+            ImGui::Text("FPS: %.0f", ImGui::GetIO().Framerate);
+            ImGui::Text("Velocity: %.2f units/s", renderer.getCameraSpeed());
+
             ImGui::Spacing();
+            if (ImGui::TreeNode("Ecosystem")) {
+                ImGui::Text("Sol has no signatures or anomalies currently.");
+                ImGui::TreePop();
+            }
+            ImGui::End();
+        }
 
-            ImGui::TextColored(ImVec4(0.5f, 1.0f, 0.5f, 1.0f), "Target Locked: Entity #%d", selectedEntity);
+        // ============  OVERVIEW (right dock)  ============
+        if (showOverview) {
+            float w = 330.0f;
+            ImGui::SetNextWindowPos(ImVec2((float)renderer.getWidth() - w - 8, 8), ImGuiCond_Always);
+            ImGui::SetNextWindowSize(ImVec2(w, (float)renderer.getHeight() - 16), ImGuiCond_Always);
+            ImGui::Begin("Overview (Solar System)", nullptr,
+                         ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                         ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus);
+            ImGui::TextColored(ImVec4(0.40f, 0.60f, 0.80f, 1.0f), "Jita IV - Moon 6 - Jita IV Moon 6 - Jita II - Jita IV - Jita VI - Jita VIII");
+            ImGui::Separator();
 
-            ImGui::Text("Temperature: %.1f K", sim.getTemperatures()[selectedEntity]);
-            ImGui::Text("Type: %s", bodyTypeName(sim.getTypes()[selectedEntity]));
+            // Simulated EVE tabs
+            if (ImGui::BeginTabBar("overviewTabs")) {
+                if (ImGui::BeginTabItem("General")) { ImGui::EndTabItem(); }
+                if (ImGui::BeginTabItem("Mining")) { ImGui::EndTabItem(); }
+                if (ImGui::BeginTabItem("Warp To")) { ImGui::EndTabItem(); }
+                if (ImGui::BeginTabItem("RPG")) { ImGui::EndTabItem(); }
+                ImGui::EndTabBar();
+            }
 
-            ImGui::Spacing();
+            static char searchBuf[128] = "";
+            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 28.0f);
+            ImGui::InputTextWithHint("##search", "Search...", searchBuf, sizeof(searchBuf));
 
-            // Camera Tracking button
-            if (renderer.isTargetLocked() && renderer.getLockedTargetIndex() == selectedEntity) {
-                if (ImGui::Button("Unlock Camera", ImVec2(-1, 30))) {
-                    renderer.unlockTarget();
+            if (ImGui::BeginTable("overviewTable", 4, ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg |
+                                  ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_SizingStretchProp)) {
+                ImGui::TableSetupScrollFreeze(0, 1);
+                ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch, 0.5f);
+                ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthStretch, 0.25f);
+                ImGui::TableSetupColumn("Dist", ImGuiTableColumnFlags_WidthStretch, 0.15f);
+                ImGui::TableSetupColumn("Vel", ImGuiTableColumnFlags_WidthStretch, 0.10f);
+                ImGui::TableHeadersRow();
+
+                std::string lowerQuery(searchBuf);
+                for (size_t i = 0; i < bNames.size(); ++i) {
+                    std::string nameLower = bNames[i];
+                    for (auto& c : nameLower) c = (char)tolower(c);
+                    if (!lowerQuery.empty() && nameLower.find(lowerQuery) == std::string::npos) continue;
+
+                    glm::vec3 cpos((float)bPos[i].x, (float)bPos[i].y, (float)bPos[i].z);
+                    float distAU = glm::length(cpos - renderer.getCameraPos());
+
+                    ImGui::PushID((int)i);
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn();
+                    ImVec4 c = bodyTypeColor(bTypes[i]);
+                    ImGui::PushStyleColor(ImGuiCol_Text, c);
+                    ImGui::Text("%s", bNames[i].c_str());
+                    ImGui::PopStyleColor();
+                    if (ImGui::IsItemClicked()) selectedEntity = (int)i;
+                    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", bodyTypeName(bTypes[i]));
+
+                    ImGui::TableNextColumn();
+                    ImGui::TextUnformatted(bodyTypeName(bTypes[i]));
+
+                    ImGui::TableNextColumn();
+                    ImGui::Text("%.3f", distAU);
+
+                    ImGui::TableNextColumn();
+                    ImGui::Text("%.2f", glm::length(glm::vec3((float)bVel[i].x, (float)bVel[i].y, (float)bVel[i].z)));
+                    ImGui::PopID();
                 }
+                ImGui::EndTable();
+            }
+            ImGui::End();
+        }
+
+        // ============  SELECTED ITEM (top-right)  ============
+        if (showSelected) {
+            ImGui::SetNextWindowPos(ImVec2((float)renderer.getWidth() - 340.0f, 8), ImGuiCond_Always);
+            ImGui::SetNextWindowSize(ImVec2(332, 0), ImGuiCond_Always);
+            ImGui::Begin("Selected Item", &showSelected, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
+
+            if (selectedEntity < 0 || selectedEntity >= (int)bNames.size()) {
+                ImGui::TextColored(ImVec4(0.45f, 0.55f, 0.65f, 1.0f), "No target selected.");
+                ImGui::TextColored(ImVec4(0.45f, 0.55f, 0.65f, 1.0f), "Select a body from the Overview or hold ALT to click in space.");
             }
             else {
+                int idx = selectedEntity;
+                ImVec4 c = bodyTypeColor(bTypes[idx]);
+                ImGui::TextColored(c, "%s", bNames[idx].c_str());
+                ImGui::TextColored(ImVec4(0.45f, 0.55f, 0.65f, 1.0f), "%s", bodyTypeName(bTypes[idx]));
+                ImGui::Separator();
+
+                ImGui::Text("Distance: %s", formatDistance(glm::length(glm::vec3((float)bPos[idx].x, (float)bPos[idx].y, (float)bPos[idx].z) - renderer.getCameraPos())).c_str());
+                ImGui::Text("Velocity: %.2f km/s", glm::length(glm::vec3((float)bVel[idx].x, (float)bVel[idx].y, (float)bVel[idx].z)) * 29.78);
+
+                ImGui::Spacing();
+                if (ImGui::BeginTable("selSpec", 2, ImGuiTableFlags_BordersInnerV)) {
+                    ImGui::TableSetupColumn("Attribute", ImGuiTableColumnFlags_WidthStretch, 0.5f);
+                    ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch, 0.5f);
+                    ImGui::TableHeadersRow();
+
+                    ImGui::TableNextRow(); ImGui::TableNextColumn(); ImGui::Text("Mass");
+                    ImGui::TableNextColumn(); ImGui::Text("%.2f M_E", bMass[idx]);
+                    ImGui::TableNextRow(); ImGui::TableNextColumn(); ImGui::Text("Radius");
+                    ImGui::TableNextColumn(); ImGui::Text("%.3f AU", bRadii[idx]);
+                    ImGui::TableNextRow(); ImGui::TableNextColumn(); ImGui::Text("Temperature");
+                    ImGui::TableNextColumn();
+                    float tmp = (float)bTemp[idx];
+                    if (tmp > 400.0f) ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.3f, 1.0f), "%.1f K", tmp);
+                    else if (tmp < 200.0f) ImGui::TextColored(ImVec4(0.5f, 0.7f, 1.0f, 1.0f), "%.1f K", tmp);
+                    else ImGui::TextColored(ImVec4(0.5f, 1.0f, 0.5f, 1.0f), "%.1f K", tmp);
+                    ImGui::EndTable();
+                }
+
+                ImGui::Spacing();
                 if (ImGui::Button("Track Orbit (Follow)", ImVec2(-1, 30))) {
-                    float viewDistance = (float)log10(sim.getMasses()[selectedEntity] + 1.0) * 8.0f + 5.0f;
-                    renderer.lockTarget(selectedEntity, viewDistance);
+                    float viewDistance = (float)log10(sim.getMasses()[idx] + 1.0) * 8.0f + 5.0f;
+                    renderer.lockTarget(idx, viewDistance);
+                }
+                if (renderer.isTargetLocked() && renderer.getLockedTargetIndex() == idx) {
+                    if (ImGui::Button("Unlock Camera", ImVec2(-1, 30))) {
+                        renderer.unlockTarget();
+                    }
+                }
+                if (ImGui::Button("Destroy Entity", ImVec2(-1, 30))) {
+                    if (renderer.isTargetLocked() && renderer.getLockedTargetIndex() == idx) {
+                        renderer.unlockTarget();
+                    }
+                    sim.removeBody(idx);
+                    selectedEntity = -1;
                 }
             }
+            ImGui::End();
+        }
 
-            // Destroy a planet button
-            if (ImGui::Button("Destroy Entity", ImVec2(-1, 30))) {
-                if (renderer.isTargetLocked() && renderer.getLockedTargetIndex() == selectedEntity) {
-                    renderer.unlockTarget();
-                }
-                sim.removeBody(selectedEntity);
-                selectedEntity = -1;
+        // ============  NAVIGATION / TIME (bottom-left)  ============
+        if (showNav) {
+            ImGui::SetNextWindowPos(ImVec2(62, (float)renderer.getHeight() - 150), ImGuiCond_Always);
+            ImGui::SetNextWindowSize(ImVec2(290, 142), ImGuiCond_Always);
+            ImGui::Begin("Navigation", &showNav,
+                         ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
+
+            ImGui::TextColored(ImVec4(0.35f, 0.80f, 1.00f, 1.0f), "Time Control");
+            ImGui::SliderFloat("Time Scale", &timeScale, 0.0f, 5.0f, "%.2fx");
+            if (ImGui::Button("Reset Time", ImVec2(-1, 24))) timeScale = 1.0f;
+            ImGui::SameLine();
+            if (ImGui::Button("Pause", ImVec2(-1, 24))) timeScale = 0.0f;
+
+            ImGui::Spacing();
+            ImGui::Separator();
+            ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.5f, 1.0f), "Navigation");
+            ImGui::SliderFloat("Camera Speed", &renderer.getCameraSpeed(), 1.0f, 500.0f, "%.1f units/s");
+
+            ImGui::Spacing();
+            ImGui::Separator();
+            if (ImGui::Button("Shoot Planet / Black Hole", ImVec2(-1, 26))) {
+                glm::vec3 camPos = renderer.getCameraPos();
+                glm::vec3 camFront = renderer.getCameraFront();
+
+                Vector3 pos(camPos.x, camPos.y, camPos.z);
+                Vector3 vel(camFront.x * shootSpeed, camFront.y * shootSpeed, camFront.z * shootSpeed);
+
+                Simulation::PlanetDesc blackhole;
+                blackhole.name = "Spawn #" + std::to_string(sim.getBodyCount());
+                blackhole.type = Simulation::BodyType::STAR;
+                blackhole.mass = 5000;
+                blackhole.position = pos;
+                blackhole.velocity = vel;
+                blackhole.radius = 0.20;
+                sim.addBody(blackhole);
+            }
+            ImGui::End();
+        }
+
+        // ============  TACTICAL HUD (bottom-center)  ============
+        if (showHud) {
+            ImGui::SetNextWindowPos(ImVec2((float)renderer.getWidth() * 0.5f - 120.0f, (float)renderer.getHeight() - 78.0f), ImGuiCond_Always);
+            ImGui::SetNextWindowSize(ImVec2(240, 74), ImGuiCond_Always);
+            ImGui::Begin("##hud", nullptr,
+                         ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                         ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
+                         ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoBringToFrontOnFocus |
+                         ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoInputs);
+
+            // Speedometer
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            ImVec2 p = ImGui::GetWindowPos();
+            ImVec2 c = ImVec2(p.x + 30, p.y + 37);
+            float radius = 26.0f;
+
+            // Outer ring
+            dl->AddCircle(c, radius, IM_COL32(60, 130, 170, 120), 48, 2.0f);
+            dl->AddCircle(c, radius * 0.68f, IM_COL32(30, 70, 95, 120), 48, 1.0f);
+
+            // Needle based on camera speed
+            float speed = renderer.getCameraSpeed();
+            float angle = glm::radians(-135.0f) + (speed / 500.0f) * glm::radians(270.0f);
+            ImVec2 needle = ImVec2(c.x + cosf(angle) * radius * 0.6f, c.y + sinf(angle) * radius * 0.6f);
+            dl->AddLine(c, needle, IM_COL32(80, 200, 255, 255), 2.0f);
+            dl->AddCircleFilled(c, 3.0f, IM_COL32(120, 220, 255, 255));
+
+            // Readouts
+            ImGui::SetCursorPos(ImVec2(72, 12));
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.35f, 0.80f, 1.00f, 1.0f));
+            ImGui::Text("VEL");
+            ImGui::PopStyleColor();
+            ImGui::SetCursorPos(ImVec2(72, 26));
+            char velBuf[32];
+            snprintf(velBuf, sizeof(velBuf), "%.1f", speed * 29.78);
+            ImGui::Text("%s km/s", velBuf);
+
+            ImGui::SetCursorPos(ImVec2(150, 12));
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.35f, 0.80f, 1.00f, 1.0f));
+            ImGui::Text("HDG");
+            ImGui::PopStyleColor();
+            ImGui::SetCursorPos(ImVec2(150, 26));
+            ImGui::Text("%.0f°", renderer.getCameraYaw());
+
+            ImGui::End();
+        }
+
+        // ============  IN-VIEWPORT 3D BRACKETS  ============
+        {
+            ImDrawList* fg = ImGui::GetForegroundDrawList();
+            for (size_t i = 0; i < bPos.size(); ++i) {
+                glm::vec2 screen;
+                float dist;
+                glm::vec3 world((float)bPos[i].x, (float)bPos[i].y, (float)bPos[i].z);
+                if (!renderer.worldToScreen(world, screen, dist)) continue;
+
+                bool isSelected = ((int)i == selectedEntity);
+                bool isLocked = renderer.isTargetLocked() && renderer.getLockedTargetIndex() == (int)i;
+
+                ImU32 col = isLocked ? IM_COL32(255, 120, 60, 255) : (isSelected ? IM_COL32(120, 220, 255, 255) : IM_COL32(90, 150, 180, 180));
+
+                float half = isSelected ? 16.0f : 12.0f;
+                float t = 5.0f; // corner tick length
+
+                ImVec2 p0(screen.x - half, screen.y - half);
+                ImVec2 p1(screen.x + half, screen.y + half);
+                // Corner brackets
+                fg->AddLine(p0, ImVec2(p0.x + t, p0.y), col, 1.5f);
+                fg->AddLine(p0, ImVec2(p0.x, p0.y + t), col, 1.5f);
+                fg->AddLine(ImVec2(p1.x - t, p1.y), p1, col, 1.5f);
+                fg->AddLine(ImVec2(p1.x, p1.y - t), p1, col, 1.5f);
+                fg->AddLine(ImVec2(p0.x, p1.y), ImVec2(p0.x, p1.y - t), col, 1.5f);
+                fg->AddLine(ImVec2(p0.x, p1.y), ImVec2(p0.x + t, p1.y), col, 1.5f);
+                fg->AddLine(ImVec2(p1.x, p0.y), ImVec2(p1.x - t, p0.y), col, 1.5f);
+                fg->AddLine(ImVec2(p1.x, p0.y), ImVec2(p1.x, p0.y + t), col, 1.5f);
+
+                // Label + distance
+                std::string label = bNames[i];
+                char distBuf[24];
+                snprintf(distBuf, sizeof(distBuf), "%.3f", dist);
+                label += "  " + std::string(distBuf) + " AU";
+                fg->AddText(ImVec2(screen.x - half, p0.y - 16.0f), IM_COL32(180, 220, 240, 200), label.c_str());
             }
         }
 
-        // Module 4: Camera Speed Settings
-        ImGui::Spacing();
-        ImGui::Separator();
-        ImGui::Spacing();
-
-        ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.5f, 1.0f), "Navigation Settings");
-        ImGui::SliderFloat("Camera Speed", &renderer.getCameraSpeed(), 1.0f, 500.0f, "%.1f units/s");
-
-        ImGui::End();
-
-        // UI rendering overlaid on 3D graphics
         renderer.endUI();
-        
+
         renderer.swapBuffers();
     }
 

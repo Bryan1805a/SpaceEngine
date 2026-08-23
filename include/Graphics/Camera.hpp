@@ -34,6 +34,9 @@ namespace Graphics {
             float lastX;
             float lastY;
 
+            // When true, the UI cursor stays visible and mouse-look is disabled
+            bool uiMode;
+
             // Default constructor
             Camera(glm::vec3 position = glm::vec3(0.0f, 6.0f, 12.0f));
 
@@ -51,6 +54,9 @@ namespace Graphics {
             void unlockTarget();
             bool isTargetLocked() const;
             void updateTracking(const std::vector<Vector3>& positions);
+
+            // Toggle the persistent UI cursor mode (Tab key)
+            void setUIMode(bool enabled) { uiMode = enabled; }
         
         private:
             // Update vector Front, Right, Up based on Yaw/Pitch

@@ -78,21 +78,81 @@ namespace Graphics {
         ImGuiIO& io = ImGui::GetIO(); (void)io;
 
         // Interface customization
-        // Sleek, minimalist Onyx Grey color scheme
+        // EVE Online-inspired tactical theme: sharp corners, translucent charcoal,
+        // dotted-grid accents, and electric cyan highlights.
         ImGui::StyleColorsDark();
         ImGuiStyle& style = ImGui::GetStyle();
-        style.WindowRounding = 5.0f;
-        style.FrameRounding = 0.0f;
-        style.WindowBorderSize = 1.0f;
 
-        // Configure the color with an Alpha channel (4th parameter) for transparency
-        // Window background: Solid black with 60% transparency
-        style.Colors[ImGuiCol_WindowBg] = ImVec4(0.02f, 0.02f, 0.02f, 0.0f);
-        style.Colors[ImGuiCol_TitleBg] = ImVec4(0.08f, 0.08f, 0.08f, 0.80f);
-        style.Colors[ImGuiCol_TitleBgActive] = ImVec4(0.15f, 0.15f, 0.15f, 0.90f);
-        style.Colors[ImGuiCol_Border] = ImVec4(0.40f, 0.40f, 0.40f, 0.30f);
-        style.Colors[ImGuiCol_FrameBg] = ImVec4(0.10f, 0.10f, 0.10f, 0.70f);
-        style.Colors[ImGuiCol_Button] = ImVec4(0.20f, 0.20f, 0.20f, 0.70f);
+        style.WindowRounding = 0.0f;
+        style.ChildRounding = 0.0f;
+        style.FrameRounding = 0.0f;
+        style.PopupRounding = 0.0f;
+        style.ScrollbarRounding = 0.0f;
+        style.GrabRounding = 0.0f;
+        style.TabRounding = 0.0f;
+
+        style.WindowBorderSize = 1.0f;
+        style.ChildBorderSize = 1.0f;
+        style.FrameBorderSize = 0.0f;
+        style.PopupBorderSize = 1.0f;
+
+        style.WindowPadding = ImVec2(8, 8);
+        style.FramePadding = ImVec2(6, 4);
+        style.ItemSpacing = ImVec2(6, 4);
+        style.ItemInnerSpacing = ImVec2(4, 4);
+        style.ScrollbarSize = 10.0f;
+        style.GrabMinSize = 8.0f;
+
+        // Palette: deep space slate / cyan
+        style.Colors[ImGuiCol_WindowBg]    = ImVec4(0.035f, 0.055f, 0.075f, 0.82f);
+        style.Colors[ImGuiCol_ChildBg]     = ImVec4(0.035f, 0.055f, 0.075f, 0.55f);
+        style.Colors[ImGuiCol_PopupBg]     = ImVec4(0.040f, 0.055f, 0.070f, 0.95f);
+        style.Colors[ImGuiCol_Border]      = ImVec4(0.20f, 0.55f, 0.75f, 0.55f);
+        style.Colors[ImGuiCol_BorderShadow]= ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
+
+        style.Colors[ImGuiCol_TitleBg]        = ImVec4(0.055f, 0.105f, 0.145f, 0.95f);
+        style.Colors[ImGuiCol_TitleBgActive]  = ImVec4(0.075f, 0.145f, 0.200f, 1.00f);
+        style.Colors[ImGuiCol_TitleBgCollapsed]= ImVec4(0.055f, 0.105f, 0.145f, 0.70f);
+
+        style.Colors[ImGuiCol_Text]         = ImVec4(0.82f, 0.89f, 0.94f, 1.00f);
+        style.Colors[ImGuiCol_TextDisabled] = ImVec4(0.35f, 0.45f, 0.52f, 1.00f);
+
+        style.Colors[ImGuiCol_FrameBg]        = ImVec4(0.045f, 0.075f, 0.100f, 0.85f);
+        style.Colors[ImGuiCol_FrameBgHovered] = ImVec4(0.070f, 0.125f, 0.165f, 0.90f);
+        style.Colors[ImGuiCol_FrameBgActive]  = ImVec4(0.100f, 0.170f, 0.220f, 0.95f);
+
+        style.Colors[ImGuiCol_Button]        = ImVec4(0.055f, 0.090f, 0.120f, 0.85f);
+        style.Colors[ImGuiCol_ButtonHovered] = ImVec4(0.100f, 0.200f, 0.280f, 0.95f);
+        style.Colors[ImGuiCol_ButtonActive]  = ImVec4(0.140f, 0.300f, 0.420f, 1.00f);
+
+        style.Colors[ImGuiCol_CheckMark]      = ImVec4(0.30f, 0.85f, 1.00f, 1.00f);
+        style.Colors[ImGuiCol_SliderGrab]     = ImVec4(0.20f, 0.60f, 0.85f, 1.00f);
+        style.Colors[ImGuiCol_SliderGrabActive] = ImVec4(0.30f, 0.80f, 1.00f, 1.00f);
+
+        style.Colors[ImGuiCol_Header]        = ImVec4(0.075f, 0.145f, 0.200f, 0.80f);
+        style.Colors[ImGuiCol_HeaderHovered] = ImVec4(0.100f, 0.210f, 0.290f, 0.90f);
+        style.Colors[ImGuiCol_HeaderActive]  = ImVec4(0.130f, 0.280f, 0.380f, 1.00f);
+
+        style.Colors[ImGuiCol_Separator]        = ImVec4(0.20f, 0.45f, 0.60f, 0.40f);
+        style.Colors[ImGuiCol_SeparatorHovered] = ImVec4(0.30f, 0.70f, 0.90f, 0.60f);
+        style.Colors[ImGuiCol_SeparatorActive]  = ImVec4(0.40f, 0.85f, 1.00f, 0.80f);
+
+        style.Colors[ImGuiCol_ScrollbarBg]        = ImVec4(0.035f, 0.050f, 0.065f, 0.80f);
+        style.Colors[ImGuiCol_ScrollbarGrab]      = ImVec4(0.15f, 0.30f, 0.40f, 0.80f);
+        style.Colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.20f, 0.45f, 0.60f, 0.90f);
+        style.Colors[ImGuiCol_ScrollbarGrabActive] = ImVec4(0.30f, 0.65f, 0.85f, 1.00f);
+
+        style.Colors[ImGuiCol_TableHeaderBg]        = ImVec4(0.060f, 0.110f, 0.150f, 0.95f);
+        style.Colors[ImGuiCol_TableBorderStrong]    = ImVec4(0.20f, 0.55f, 0.75f, 0.60f);
+        style.Colors[ImGuiCol_TableBorderLight]     = ImVec4(0.12f, 0.25f, 0.35f, 0.40f);
+        style.Colors[ImGuiCol_TableRowBg]           = ImVec4(0.040f, 0.065f, 0.085f, 0.50f);
+        style.Colors[ImGuiCol_TableRowBgAlt]        = ImVec4(0.055f, 0.085f, 0.110f, 0.50f);
+
+        style.Colors[ImGuiCol_Tab]           = ImVec4(0.055f, 0.090f, 0.120f, 0.90f);
+        style.Colors[ImGuiCol_TabHovered]    = ImVec4(0.100f, 0.200f, 0.280f, 0.95f);
+        style.Colors[ImGuiCol_TabSelected]   = ImVec4(0.100f, 0.240f, 0.330f, 1.00f);
+        style.Colors[ImGuiCol_TabUnfocused]  = ImVec4(0.040f, 0.065f, 0.085f, 0.80f);
+        style.Colors[ImGuiCol_TabUnfocusedActive] = ImVec4(0.075f, 0.145f, 0.200f, 0.90f);
 
         // Connect backend
         ImGui_ImplGlfw_InitForOpenGL(window, true);
@@ -353,6 +413,14 @@ namespace Graphics {
         }
         f11WasPressed = f11Pressed;
 
+        // Tab -> toggle the persistent UI cursor mode (show cursor, pause mouse-look)
+        bool tabPressed = glfwGetKey(window, GLFW_KEY_TAB) == GLFW_PRESS;
+        if (tabPressed && !tabWasPressed) {
+            uiCursorEnabled = !uiCursorEnabled;
+            camera.setUIMode(uiCursorEnabled);
+        }
+        tabWasPressed = tabPressed;
+
         // Camera movement and rotation (free-fly or orbit)
         camera.processInput(window, deltaTime);
     }
@@ -385,6 +453,32 @@ namespace Graphics {
 
         // Returns the normalized direction vector
         return glm::normalize(ray_wor);
+    }
+
+    bool Renderer::worldToScreen(const glm::vec3& worldPos, glm::vec2& outScreenPos, float& outDist) const {
+        // Rebuild the same projection/view used by the main draw pass
+        glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)width / (float)height, 0.1f, 1000.0f);
+        glm::mat4 view = camera.getViewMatrix();
+
+        glm::vec4 clip = projection * view * glm::vec4(worldPos, 1.0f);
+
+        // Behind the camera (or on the near plane) -> not visible
+        if (clip.w <= 0.0f) return false;
+
+        glm::vec3 ndc = glm::vec3(clip) / clip.w;
+
+        // Outside the frustum (|x| or |y| > 1, or z outside [-1, 1])
+        if (ndc.x < -1.0f || ndc.x > 1.0f || ndc.y < -1.0f || ndc.y > 1.0f || ndc.z < -1.0f || ndc.z > 1.0f) {
+            return false;
+        }
+
+        // Convert NDC to pixel coordinates (flip Y because ImGui origin is top-left)
+        outScreenPos.x = (ndc.x * 0.5f + 0.5f) * (float)width;
+        outScreenPos.y = (1.0f - (ndc.y * 0.5f + 0.5f)) * (float)height;
+
+        // Distance from the camera (in world units)
+        outDist = glm::length(worldPos - camera.Position);
+        return true;
     }
 
     void Renderer::initFramebuffers() {
@@ -431,6 +525,10 @@ namespace Graphics {
 
     void Renderer::lockTarget(int entityIndex, float distance) {
         camera.lockTarget(entityIndex, distance);
+
+        // Locking a target puts us back into space mode (hide cursor, enable look)
+        uiCursorEnabled = false;
+        camera.setUIMode(false);
 
         // When locking onto a target, hide the cursor to use the mouse for rotating the camera orbit
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);

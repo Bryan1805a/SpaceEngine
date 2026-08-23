@@ -18,7 +18,8 @@ namespace Graphics {
           orbitPhi(0.0f),
           firstMouse(true),
           lastX(0.0f),
-          lastY(0.0f) {
+          lastY(0.0f),
+          uiMode(false) {
         updateCameraVectors();
     }
 
@@ -31,10 +32,12 @@ namespace Graphics {
     }
 
     void Camera::processInput(GLFWwindow* window, float deltaTime) {
-        // Unlock mouse cursor while holding Left Alt, re-lock on release
-        if (glfwGetKey(window, GLFW_KEY_LEFT_ALT) == GLFW_PRESS) {
+        // Cursor is visible when in persistent UI mode OR while temporarily
+        // unlocking with Left Alt (used for in-space raycast selection).
+        bool cursorVisible = uiMode || (glfwGetKey(window, GLFW_KEY_LEFT_ALT) == GLFW_PRESS);
+        if (cursorVisible) {
             glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-            firstMouse = true; // Prevent camera jitter when hiding the mouse cursor
+            firstMouse = true; // Prevent camera jitter when re-hiding the mouse cursor
         }
         else {
             glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -58,8 +61,8 @@ namespace Graphics {
                 orbitDistance = 500.0f;
             }
 
-            // If left Alt is not pressed
-            if (!(glfwGetKey(window, GLFW_KEY_LEFT_ALT) == GLFW_PRESS)) {
+            // If the cursor is hidden (space mode), allow orbit rotation
+            if (!cursorVisible) {
                 double xpos, ypos;
 
                 glfwGetCursorPos(window, &xpos, &ypos);
@@ -101,7 +104,7 @@ namespace Graphics {
                 Position += Right * moveSpeed;
             }
 
-            if (!(glfwGetKey(window, GLFW_KEY_LEFT_ALT) == GLFW_PRESS)) {
+            if (!cursorVisible) {
                 double xpos, ypos;
                 glfwGetCursorPos(window, &xpos, &ypos);
                 if (firstMouse) {
