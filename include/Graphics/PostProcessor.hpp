@@ -37,7 +37,13 @@ namespace Graphics {
         // Blend images and output to screen
         void renderToScreen(const Shader& screenShader, const Mesh& quadMesh) const;
 
+        // Update FBO dimensions when changing resolution
+        void resize(int newWidth, int newHeight);
+
     private:
         mutable bool finalHorizontal; // Which pingpong buffer holds the final bloom blur
+
+        void initFBOs();
+        void cleanupFBOs();
     };
 }

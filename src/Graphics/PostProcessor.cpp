@@ -13,18 +13,17 @@ namespace Graphics {
     }
 
     PostProcessor::~PostProcessor() {
-        glDeleteFramebuffers(2, pingpongFBO);
-        glDeleteTextures(2, pingpongColorbuffers);
-        glDeleteTextures(1, &textureColorbuffer);
-        glDeleteTextures(1, &textureBloombuffer);
-        glDeleteRenderbuffers(1, &RBO);
-        glDeleteFramebuffers(1, &mainFBO);
+        cleanupFBOs();
     }
 
     void PostProcessor::init(int windowWidth, int windowHeight) {
         width = windowWidth;
         height = windowHeight;
 
+        initFBOs();
+    }
+
+    void PostProcessor::initFBOs() {
         // Main off-screen FBO: scene color + bloom highlight + depth/stencil
         glGenFramebuffers(1, &mainFBO);
         glBindFramebuffer(GL_FRAMEBUFFER, mainFBO);
@@ -70,6 +69,29 @@ namespace Graphics {
             glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pingpongColorbuffers[i], 0);
         }
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    }
+
+    void PostProcessor::cleanupFBOs() {
+        glDeleteFramebuffers(2, pingpongFBO);
+        glDeleteTextures(2, pingpongColorbuffers);
+        glDeleteTextures(1, &textureColorbuffer);
+        glDeleteTextures(1, &textureBloombuffer);
+        glDeleteRenderbuffers(1, &RBO);
+        glDeleteFramebuffers(1, &mainFBO);
+
+        mainFBO = textureColorbuffer = textureBloombuffer = RBO = 0;
+        pingpongFBO[0] = pingpongFBO[1] = 0;
+        pingpongColorbuffers[0] = pingpongColorbuffers[1] = 0;
+    }
+
+    void PostProcessor::resize(int newWidth, int newHeight) {
+        if (newWidth <= 0 || newHeight <= 0) return; // Ignore minimize events
+        if (newWidth == width && newHeight == height) return; // Nothing to do
+
+        cleanupFBOs();
+        width = newWidth;
+        height = newHeight;
+        initFBOs();
     }
 
     void PostProcessor::beginRender() const {
