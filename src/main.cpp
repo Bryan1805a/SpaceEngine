@@ -94,7 +94,7 @@ int main() {
     sim.addBody(jupiter);
 
     // Init graphics
-    Graphics::Renderer renderer(1280, 720, "Galaxy Simulation");
+    Graphics::Renderer renderer(1280, 720, "SpaceEngine");
     std::cout << "Initialised 1000 asteroids" << std::endl;
     std::cout << "Press X to quit" << std::endl;
 

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 4.0)
 
-project(NBodySimulation
+project(SpaceEngine
     VERSION 0.1.0
     LANGUAGES CXX
 )
@@ -50,7 +50,7 @@ FetchContent_GetProperties(imgui SOURCE_DIR imgui_dir)
 
 find_package(OpenGL REQUIRED)
 
-add_executable(n_body
+add_executable(SpaceEngine
     src/main.cpp
     src/glad.c
     include/Simulation/Simulation.hpp
@@ -73,21 +73,21 @@ add_executable(n_body
     ${imgui_dir}/backends/imgui_impl_opengl3.cpp
 )
 
-target_include_directories(n_body PRIVATE
+target_include_directories(SpaceEngine PRIVATE
     "${CMAKE_SOURCE_DIR}/include"
     ${imgui_dir}
     ${imgui_dir}/backends
 )
 
-target_link_libraries(n_body PRIVATE
+target_link_libraries(SpaceEngine PRIVATE
     glfw
     glm::glm
     OpenGL::GL
 )
 
 # Copy shader assets next to the executable so they can be loaded at runtime
-add_custom_command(TARGET n_body POST_BUILD
+add_custom_command(TARGET SpaceEngine POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_SOURCE_DIR}/assets"
-        "$<TARGET_FILE_DIR:n_body>/assets"
+        "$<TARGET_FILE_DIR:SpaceEngine>/assets"
 )
