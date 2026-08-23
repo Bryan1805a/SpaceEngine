@@ -26,12 +26,26 @@ namespace Graphics {
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 4);
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-        window = glfwCreateWindow(width, height, title, nullptr, nullptr);
+        // Boot straight into fullscreen on the primary monitor
+        GLFWmonitor* monitor = glfwGetPrimaryMonitor();
+        const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+
+        // Remember the windowed geometry (centered) so F11 can restore it
+        windowedWidth = w;
+        windowedHeight = h;
+        windowedX = (mode->width - w) / 2;
+        windowedY = (mode->height - h) / 2;
+
+        window = glfwCreateWindow(mode->width, mode->height, title, monitor, nullptr);
         if (!window) {
         std::cerr << "ERROR: Cannot init GLFW window" << std::endl;
             glfwTerminate();
             return;
         }
+
+        isFullscreen = true;
+        width = mode->width;
+        height = mode->height;
 
         // Assign context into this processing thread
         glfwMakeContextCurrent(window);
