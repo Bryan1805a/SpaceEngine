@@ -39,6 +39,12 @@ namespace Graphics {
 
             Shader blurShaderProgram;
 
+            // Fullscreen toggle state
+            bool isFullscreen = false;
+            bool f11WasPressed = false;
+            int windowedX = 0, windowedY = 0;
+            int windowedWidth = 0, windowedHeight = 0;
+
             // Skybox shader
             Shader skyboxShaderProgram;
 

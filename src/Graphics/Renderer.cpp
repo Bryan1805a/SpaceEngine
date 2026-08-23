@@ -319,6 +319,26 @@ namespace Graphics {
             glfwSetWindowShouldClose(window, true);
         }
 
+        // F11 -> toggle fullscreen (edge-triggered so holding it doesn't flicker)
+        bool f11Pressed = glfwGetKey(window, GLFW_KEY_F11) == GLFW_PRESS;
+        if (f11Pressed && !f11WasPressed) {
+            if (!isFullscreen) {
+                // Save the windowed geometry to restore it later
+                glfwGetWindowPos(window, &windowedX, &windowedY);
+                glfwGetWindowSize(window, &windowedWidth, &windowedHeight);
+
+                GLFWmonitor* monitor = glfwGetPrimaryMonitor();
+                const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+                glfwSetWindowMonitor(window, monitor, 0, 0, mode->width, mode->height, mode->refreshRate);
+            }
+            else {
+                glfwSetWindowMonitor(window, nullptr, windowedX, windowedY,
+                                     windowedWidth, windowedHeight, GLFW_DONT_CARE);
+            }
+            isFullscreen = !isFullscreen;
+        }
+        f11WasPressed = f11Pressed;
+
         // Camera movement and rotation (free-fly or orbit)
         camera.processInput(window, deltaTime);
     }
