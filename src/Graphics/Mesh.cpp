@@ -1,4 +1,5 @@
 #include <iostream>
+#include <cmath>
 #include <Graphics/Mesh.hpp>
 #include <../third_party/tiny_obj_loader.h>
 
@@ -205,6 +206,20 @@ namespace Graphics {
                     vertices.push_back(0.0f);
                     vertices.push_back(0.0f);
                 }
+            }
+        }
+
+        // Normalize vertices to radius 1.0 to match the math/physics engine
+        float maxRadius = 0.0f;
+        for (size_t i = 0; i < vertices.size(); i += 8) {
+            float r = std::sqrt(vertices[i]*vertices[i] + vertices[i+1]*vertices[i+1] + vertices[i+2]*vertices[i+2]);
+            if (r > maxRadius) maxRadius = r;
+        }
+        if (maxRadius > 0.0001f) {
+            for (size_t i = 0; i < vertices.size(); i += 8) {
+                vertices[i] /= maxRadius;
+                vertices[i+1] /= maxRadius;
+                vertices[i+2] /= maxRadius;
             }
         }
 
