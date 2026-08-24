@@ -8,6 +8,7 @@ uniform vec2 sunPos;
 uniform float sunVisible;  // 1.0 = Sun visible, 0.0 = hidden
 uniform float aspect;      // width / height, to keep flare elements round
 uniform float intensity;   // master brightness scale tied to the Sun's prominence
+uniform float baseRadius;  // Sun's actual radius in UV space
 
 // Soft radial falloff around an element centre.
 float glow(float d, float radius) {
@@ -33,10 +34,10 @@ void main() {
 
     vec3 col = vec3(0.0);
 
-    // Primary halo hugging the Sun.
-    col += vec3(1.00, 0.85, 0.60) * glow(d0, 0.55) * 0.28;
-    col += vec3(1.00, 0.95, 0.80) * glow(d0, 0.16) * 0.75;
-    col += vec3(0.65, 0.80, 1.00) * ring(d0, 0.22, 0.015) * 0.22;
+    // Primary halo hugging the Sun (3 to 5 times the size of the sun).
+    col += vec3(1.00, 0.85, 0.60) * glow(d0, baseRadius * 5.0) * 0.28;
+    col += vec3(1.00, 0.95, 0.80) * glow(d0, baseRadius * 3.0) * 0.75;
+    col += vec3(0.65, 0.80, 1.00) * ring(d0, baseRadius * 4.0, baseRadius * 0.15) * 0.22;
 
     // Axis from the Sun toward the centre of the screen.
     vec2 axis = vec2((0.5 - sunPos.x) * aspect, 0.5 - sunPos.y);

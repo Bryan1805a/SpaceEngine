@@ -662,6 +662,15 @@ namespace Graphics {
         flareShaderProgram.setVec2("sunPos", u, v);
         flareShaderProgram.setFloat("sunVisible", sunVisible);
         flareShaderProgram.setFloat("aspect", (float)width / (float)height);
+        
+        // Calculate the Sun's size in UV space based on perspective projection
+        float sunWorldRadius = (float)radii[0];
+        glm::vec3 toSun = sunPos - camera.Position;
+        float fov = glm::radians(45.0f);
+        float sunRadiusNDC = (sunWorldRadius / std::max(glm::length(toSun), 1.0e-6f)) / std::tan(fov * 0.5f);
+        float baseRadius = sunRadiusNDC * 0.5f; 
+        flareShaderProgram.setFloat("baseRadius", baseRadius);
+
         // Boost so the halo reads clearly against the dark space background.
         flareShaderProgram.setFloat("intensity", 1.0f);
 
