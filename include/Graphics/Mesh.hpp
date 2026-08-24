@@ -17,6 +17,7 @@ namespace Graphics {
             void initSphere(int sectorCount, int stackCount);
             void initQuad();
             void initOrbitLine(int segments = 120);
+            bool loadOBJ(const char* path);
 
             void draw(unsigned int mode = 0x0004) const;
 

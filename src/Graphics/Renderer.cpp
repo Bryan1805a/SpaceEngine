@@ -89,6 +89,13 @@ namespace Graphics {
         // Load the HDR environment map used by the skybox
         hdrTexture = loadHDRTexture("assets/textures/skybox/HDR_multi_nebulae_1.hdr");
 
+        // Load textures
+        earthMesh.loadOBJ("assets/models/earth.obj");
+        earthAlbedo = loadTexture("assets/textures/earth_albedo.jpg");
+        earthSpecular = loadTexture("assets/textures/earth_land_ocean_mask.png");
+        earthEmission = loadTexture("assets/textures/earth_night_lights_modified.png");
+
+
         // Init ImGui
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
@@ -269,7 +276,12 @@ namespace Graphics {
             model = glm::translate(glm::mat4(1.0f), pos) * glm::mat4_cast(orientations[i]) * glm::scale(glm::mat4(1.0f), glm::vec3(radius));
 
             shadowShaderProgram.setMat4("model", model);
-            sphere.draw();
+            
+            if (static_cast<int>(types[i]) == 1) {
+                earthMesh.draw();
+            } else {
+                sphere.draw();
+            }
         }
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glViewport(0, 0, width, height);
@@ -360,8 +372,26 @@ namespace Graphics {
             // Send this object's own model matrix to the GPU
             shaderProgram.setMat4("model", model);
 
-            // Draw the sphere mesh
-            sphere.draw();
+            if (static_cast<int>(types[i]) == 1) {
+                // Bind textures for Earth
+                glActiveTexture(GL_TEXTURE3);
+                glBindTexture(GL_TEXTURE_2D, earthAlbedo);
+                shaderProgram.setInt("albedoMap", 3);
+                
+                glActiveTexture(GL_TEXTURE4);
+                glBindTexture(GL_TEXTURE_2D, earthSpecular);
+                shaderProgram.setInt("specularMap", 4);
+
+                glActiveTexture(GL_TEXTURE5);
+                glBindTexture(GL_TEXTURE_2D, earthEmission);
+                shaderProgram.setInt("emissionMap", 5);
+
+                // Draw the earth mesh
+                earthMesh.draw();
+            } else {
+                // Draw the sphere mesh
+                sphere.draw();
+            }
         }
 
         // Draw Orbits
@@ -381,11 +411,8 @@ namespace Graphics {
                 glm::mat4 model = glm::translate(glm::mat4(1.0f), sunPos) * glm::scale(glm::mat4(1.0f), glm::vec3(dist));
                 orbitShader.setMat4("model", model);
                 
-                // Color based on body type
+                // Color
                 glm::vec4 orbitColor(0.5f, 0.5f, 0.5f, 0.25f);
-                if (types[i] == Simulation::BodyType::ROCKY_PLANET) orbitColor = glm::vec4(0.60f, 0.80f, 0.90f, 0.25f);
-                else if (types[i] == Simulation::BodyType::GAS_GIANT) orbitColor = glm::vec4(0.55f, 0.85f, 0.70f, 0.25f);
-                else if (types[i] == Simulation::BodyType::ICE_MOON) orbitColor = glm::vec4(0.70f, 0.85f, 1.00f, 0.25f);
                 
                 orbitShader.setVec4("orbitColor", orbitColor);
                 orbitMesh.draw(GL_LINE_LOOP);
@@ -739,5 +766,43 @@ namespace Graphics {
             std::cerr << "ERROR::HDR::Cannot download the image: " << path << std::endl;
         }
         return hdrTexture;
+    }
+
+    unsigned int Renderer::loadTexture(const char* path) {
+        unsigned int textureID;
+        glGenTextures(1, &textureID);
+
+        int width, height, nrComponents;
+        stbi_set_flip_vertically_on_load(false);
+        unsigned char *data = stbi_load(path, &width, &height, &nrComponents, 0);
+
+        if (data) {
+            GLenum format;
+            if (nrComponents == 1) {
+                format = GL_RED;
+            }
+            else if (nrComponents == 3) {
+                format = GL_RGB;
+            }
+            else if (nrComponents == 4) {
+                format = GL_RGBA;
+            }
+
+            glBindTexture(GL_TEXTURE_2D, textureID);
+            glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+            glGenerateMipmap(GL_TEXTURE_2D); // Generate mipmaps to prevent noise in downscaled images
+
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+            stbi_image_free(data);
+        }
+        else {
+            std::cerr << "ERROR::TEXTURE::Cannot load image: " << path << std::endl;
+        }
+
+        return textureID;
     }
 }

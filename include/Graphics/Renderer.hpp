@@ -71,6 +71,10 @@ namespace Graphics {
             mutable float viewNear;
             mutable float viewFar;
 
+            // New mesh for Earth
+            Mesh earthMesh;
+            unsigned int earthTexture; // Storing surface image
+
             // Orbit line
             Shader orbitShader;
             Mesh orbitMesh;
@@ -89,6 +93,10 @@ namespace Graphics {
             void drawLensFlare(size_t count,
                                const std::vector<Vector3>& positions,
                                const std::vector<double>& radii) const;
+            
+            // Load texture
+            unsigned int earthAlbedo, earthSpecular, earthEmission;
+            unsigned int loadTexture(const char* path);
         public:
             Renderer(int w, int h, const char* title);
 

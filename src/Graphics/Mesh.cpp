@@ -1,4 +1,6 @@
+#include <iostream>
 #include <Graphics/Mesh.hpp>
+#include <../third_party/tiny_obj_loader.h>
 
 namespace Graphics {
     Mesh::Mesh() : VAO(0), VBO(0), EBO(0), indexCount(0), vertexCount(0), hasIndices(false) {}
@@ -154,5 +156,80 @@ namespace Graphics {
         }
         glDeleteBuffers(1, &VBO);
         glDeleteVertexArrays(1, &VAO);
+    }
+
+    bool Mesh::loadOBJ(const char* path) {
+        tinyobj::attrib_t attrib;
+        std::vector<tinyobj::shape_t> shapes;
+        std::vector<tinyobj::material_t> materials;
+        std::string warn, err;
+
+        // Read .obj file
+        if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, path)) {
+            std::cerr << "ERROR:TINYOBJ::" << warn << err << std::endl;
+            return false;
+        }
+
+        std::vector<float> vertices;
+
+        // Scan across all the polygons of the model
+        for (size_t s = 0; s < shapes.size(); s++) {
+            for (size_t i = 0; i < shapes[s].mesh.indices.size(); i++) {
+                tinyobj::index_t idx = shapes[s].mesh.indices[i];
+
+                // Vertex coordinates (Position)
+                vertices.push_back(attrib.vertices[3 * idx.vertex_index + 0]);
+                vertices.push_back(attrib.vertices[3 * idx.vertex_index + 1]);
+                vertices.push_back(attrib.vertices[3 * idx.vertex_index + 2]);
+
+                // Normal vector
+                // To calculate lighting and shadows
+                if (idx.normal_index >= 0) {
+                    vertices.push_back(attrib.normals[3 * idx.normal_index + 0]);
+                    vertices.push_back(attrib.normals[3 * idx.normal_index + 1]);
+                    vertices.push_back(attrib.normals[3 * idx.normal_index + 2]);
+                }
+                else {
+                    vertices.push_back(0.0f);
+                    vertices.push_back(1.0f);
+                    vertices.push_back(0.0f);
+                }
+
+                // Image coordinates (UV/TexCoords)
+                // For mapping an image
+                if (idx.texcoord_index >= 0) {
+                    vertices.push_back(attrib.texcoords[2 * idx.texcoord_index + 0]);
+                    vertices.push_back(1.0f - attrib.texcoords[2 * idx.texcoord_index + 1]); // Flip Y to match OpenGL
+                }
+                else {
+                    vertices.push_back(0.0f);
+                    vertices.push_back(0.0f);
+                }
+            }
+        }
+
+        vertexCount = vertices.size() / 8; // (3 Pos + 3 Norm + 2 UV = 8 floats/vertex)
+        hasIndices = false;
+
+        // Push all data to VRAM
+        glGenVertexArrays(1, &VAO);
+        glGenBuffers(1, &VBO);
+
+        glBindVertexArray(VAO);
+        glBindBuffer(GL_ARRAY_BUFFER, VBO);
+        glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
+
+        // Position
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(0);
+        // Normal
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+        glEnableVertexAttribArray(1);
+        // UV
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+        glEnableVertexAttribArray(2);
+
+        glBindVertexArray(0);
+        return true;
     }
 }

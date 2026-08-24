@@ -64,6 +64,7 @@ add_executable(SpaceEngine
     src/Graphics/Mesh.cpp
     src/Graphics/PostProcessor.cpp
     src/Physics/Octree.cpp
+    src/tiny_obj.cpp
 
     # Compiling with ImGui source code
     ${imgui_dir}/imgui.cpp
