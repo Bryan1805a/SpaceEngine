@@ -61,8 +61,30 @@ namespace Graphics {
 
             unsigned int loadHDRTexture(const char* path);
 
+            // Procedural lens flare (screen-space pass over the scene)
+            Shader flareShaderProgram;
+
+            // Adaptive near/far planes. Rebuilt every frame from the camera's focus
+            // distance, so the depth range stays tight when zooming from the whole
+            // solar system down to a single planet. Mutable: shared with the const
+            // helper methods (worldToScreen / getRayDirection) for HUD consistency.
+            mutable float viewNear;
+            mutable float viewFar;
+
             // Create the shadow-map FBO and the UI-blur pingpong buffers
             void initFramebuffers();
+
+            // Distance from the camera to the nearest planetary surface (or the Sun).
+            // Drives the adaptive near/far planes so depth range always stays tight.
+            float computeNearestSceneDistance(size_t count,
+                                              const std::vector<Vector3>& positions,
+                                              const std::vector<double>& radii) const;
+
+            // Draws a procedural lens flare composed of the Sun's screen position.
+            // Renders on top of the scene using additive blending.
+            void drawLensFlare(size_t count,
+                               const std::vector<Vector3>& positions,
+                               const std::vector<double>& radii) const;
         public:
             Renderer(int w, int h, const char* title);
 
@@ -100,11 +122,14 @@ namespace Graphics {
 
             // API for Camera Tracking
             float& getCameraSpeed() {return camera.MovementSpeed;}
-            void lockTarget(int entityIndex, float distance = 50.0f);
+            void lockTarget(int entityIndex, float distance = 50.0f, float planetRadius = 0.05f);
             void unlockTarget();
             bool isTargetLocked() const { return camera.isTargetLocked(); }
             int getLockedTargetIndex() const { return camera.lockedTargetIndex; }
             void updateCameraTracking(const std::vector<Vector3>& positions);
+
+            // Forward mouse-wheel scroll to the camera for zooming
+            void addScroll(float yoffset) { camera.addScroll(yoffset); }
 
             // Declare a function to expose the window to main.cpp for reading the ALT key
             GLFWwindow* getWindow() const {return window;}

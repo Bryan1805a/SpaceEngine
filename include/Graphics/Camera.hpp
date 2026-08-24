@@ -29,6 +29,10 @@ namespace Graphics {
             float orbitTheta;
             float orbitPhi;
 
+            // Radius of the currently locked target (in world units).
+            // Used to clamp the zoom so the camera never orbits inside a planet.
+            float targetRadius;
+
             // Cursor status
             bool firstMouse;
             float lastX;
@@ -36,6 +40,9 @@ namespace Graphics {
 
             // When true, the UI cursor stays visible and mouse-look is disabled
             bool uiMode;
+
+            // Accumulated mouse-wheel delta consumed during the next input pass
+            float scrollAccum;
 
             // Default constructor
             Camera(glm::vec3 position = glm::vec3(0.0f, 6.0f, 12.0f));
@@ -50,16 +57,23 @@ namespace Graphics {
             void processInput(GLFWwindow* window, float deltaTime);
 
             // API Tracking
-            void lockTarget(int entityIndex, float distance);
+            void lockTarget(int entityIndex, float distance, float planetRadius = 0.05f);
             void unlockTarget();
             bool isTargetLocked() const;
             void updateTracking(const std::vector<Vector3>& positions);
 
             // Toggle the persistent UI cursor mode (Tab key)
             void setUIMode(bool enabled) { uiMode = enabled; }
+
+            // Mouse-wheel zoom for the locked-orbit camera
+            void addScroll(float yoffset) { scrollAccum += yoffset; }
         
         private:
             // Update vector Front, Right, Up based on Yaw/Pitch
             void updateCameraVectors();
+
+            // A smoothly-varying scale that adapts the free-fly speed to the
+            // size of the region being viewed (bounded to avoid runaway speeds).
+            float clampViewScale() const;
     };
 }

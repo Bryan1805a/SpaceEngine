@@ -8,7 +8,7 @@ uniform bool horizontal; // Determine the blurring direction
 uniform float weight[5];
 
 void main() {
-    vec2 tex_offset = 1.0 / textureSize(image, 0);
+    vec2 tex_offset = (1.0 / textureSize(image, 0)) * 4;
     vec3 result = texture(image, TexCoords).rgb * weight[0];
 
     if(horizontal) {

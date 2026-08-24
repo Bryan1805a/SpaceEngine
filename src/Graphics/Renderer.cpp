@@ -16,7 +16,16 @@
 #include <stb_image.h>
 
 namespace Graphics {
-    Renderer::Renderer(int w, int h, const char* title) : width(w), height(h), window(nullptr) {
+    // GLFW scroll callback: forwards mouse-wheel deltas to whichever Renderer owns
+    // the window (looked up through the window user pointer, set in the ctor).
+    static void scrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
+        auto* renderer = static_cast<Renderer*>(glfwGetWindowUserPointer(window));
+        if (renderer) {
+            renderer->addScroll((float)yoffset);
+        }
+    }
+
+    Renderer::Renderer(int w, int h, const char* title) : width(w), height(h), window(nullptr), viewNear(0.1f), viewFar(1000.0f) {
         if (!glfwInit()) {
             std::cerr << "ERROR: Cannot init GLFW" << std::endl;
             return;
@@ -59,6 +68,10 @@ namespace Graphics {
 
         // Lock the mouse cursor to the center of the screen and hide it
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
+        // Remember this Renderer for the scroll callback, then enable mouse-wheel zoom
+        glfwSetWindowUserPointer(window, this);
+        glfwSetScrollCallback(window, scrollCallback);
 
         // Set the background color for the space environment
         glClearColor(0.12f, 0.12f, 0.12f, 1.0f);
@@ -170,6 +183,7 @@ namespace Graphics {
         blurShaderProgram = Shader("assets/shaders/screen.vert", "assets/shaders/blur.frag");
         skyboxShaderProgram = Shader("assets/shaders/skybox.vert", "assets/shaders/skybox.frag");
         shadowShaderProgram = Shader("assets/shaders/shadow.vert", "assets/shaders/shadow.frag", "assets/shaders/shadow.geom");
+        flareShaderProgram = Shader("assets/shaders/screen.vert", "assets/shaders/flare.frag");
     }
 
     Renderer::~Renderer() {
@@ -191,6 +205,7 @@ namespace Graphics {
         glDeleteProgram(blurShaderProgram.ID);
         glDeleteProgram(skyboxShaderProgram.ID);
         glDeleteProgram(shadowShaderProgram.ID);
+        glDeleteProgram(flareShaderProgram.ID);
 
         if (window) {
             glfwDestroyWindow(window);
@@ -267,9 +282,18 @@ namespace Graphics {
 
         // Setup CAMERA and SPACE
 
+        // Adaptive near/far planes, derived from the distance to the nearest scene
+        // content. This keeps the depth buffer precise whether we're viewing the
+        // whole solar system (~100s of units away) or a single planet (~1e-4 units).
+        float nearestScene = computeNearestSceneDistance(count, positions, radii);
+
+        // Near plane: a small fraction of the nearest content so nothing the camera
+        // is looking at gets clipped. Far plane: enough to cover the whole system.
+        viewNear = glm::clamp(nearestScene * 0.01f, 5.0e-6f, 0.5f);
+        viewFar = glm::max(nearestScene * 500.0f, 100.0f);
+
         // Projection Matrix
-        // Creates a perspective effect (45 FOV, view range from 0.1 to 1000.0)
-        glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)width / (float)height, 0.1f, 1000.0f);
+        glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)width / (float)height, viewNear, viewFar);
         shaderProgram.setMat4("projection", projection);
 
         // View Matrix
@@ -335,6 +359,9 @@ namespace Graphics {
             // Draw the sphere mesh
             sphere.draw();
         }
+
+        // Draw Lens Flare on top of the scene (additive, screen-space)
+        drawLensFlare(count, positions, radii);
 
         // Apply Gaussian Blur for the UI frosted-glass background
         bool horizontal = true, first_iteration = true;
@@ -453,7 +480,7 @@ namespace Graphics {
         glm::vec4 ray_clip(x, y, -1.0f, 1.0f); // The ray starts from the near plane
 
         // View Space with Inverse Matrix
-        glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)width / (float)height, 0.1f, 1000.0f);
+        glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)width / (float)height, viewNear, viewFar);
         glm::vec4 ray_eye = glm::inverse(projection) * ray_clip;
         ray_eye = glm::vec4(ray_eye.x, ray_eye.y, -1.0f, 0.0f); // Set w=0 to turn it into a direction vector
 
@@ -467,7 +494,7 @@ namespace Graphics {
 
     bool Renderer::worldToScreen(const glm::vec3& worldPos, glm::vec2& outScreenPos, float& outDist) const {
         // Rebuild the same projection/view used by the main draw pass
-        glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)width / (float)height, 0.1f, 1000.0f);
+        glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)width / (float)height, viewNear, viewFar);
         glm::mat4 view = camera.getViewMatrix();
 
         glm::vec4 clip = projection * view * glm::vec4(worldPos, 1.0f);
@@ -533,8 +560,8 @@ namespace Graphics {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
-    void Renderer::lockTarget(int entityIndex, float distance) {
-        camera.lockTarget(entityIndex, distance);
+    void Renderer::lockTarget(int entityIndex, float distance, float planetRadius) {
+        camera.lockTarget(entityIndex, distance, planetRadius);
 
         // Locking a target puts us back into space mode (hide cursor, enable look)
         uiCursorEnabled = false;
@@ -548,8 +575,101 @@ namespace Graphics {
         camera.unlockTarget();
     }
 
+    float Renderer::computeNearestSceneDistance(size_t count, const std::vector<Vector3>& positions, const std::vector<double>& radii) const {
+        if (count == 0) {
+            return 20.0f;
+        }
+
+        glm::vec3 camPos = camera.Position;
+        float nearest = 1.0e10f;
+
+        for (size_t i = 0; i < count; ++i) {
+            glm::vec3 body((float)positions[i].x, (float)positions[i].y, (float)positions[i].z);
+            float radius = (float)radii[i];
+
+            // Distance from the camera to the body's surface, never below 0.
+            float surfaceDist = glm::length(camPos - body) - radius;
+            if (surfaceDist < nearest) {
+                nearest = surfaceDist;
+            }
+        }
+
+        // Keep a healthy minimum so the view never collapses onto a single point.
+        if (nearest < 1.0e-5f) nearest = 1.0e-5f;
+        return nearest;
+    }
+
     void Renderer::updateCameraTracking(const std::vector<Vector3>& positions) {
         camera.updateTracking(positions);
+    }
+
+    void Renderer::drawLensFlare(size_t count, const std::vector<Vector3>& positions, const std::vector<double>& radii) const {
+        if (count == 0) return;
+
+        // The Sun is the first body (the star). Project its world position to UV.
+        glm::vec3 sunPos((float)positions[0].x, (float)positions[0].y, (float)positions[0].z);
+
+        glm::mat4 proj = glm::perspective(glm::radians(45.0f), (float)width / (float)height, viewNear, viewFar);
+        glm::mat4 view = camera.getViewMatrix();
+
+        glm::vec4 clip = proj * view * glm::vec4(sunPos, 1.0f);
+
+        // Behind the camera -> no flare.
+        float sunVisible = 1.0f;
+        if (clip.w <= 0.0f) {
+            sunVisible = 0.0f;
+        } else {
+            glm::vec3 ndc = glm::vec3(clip) / clip.w;
+            // If the Sun is off-screen we still allow a faint flare from its glow
+            // when it's just outside the frame, but fade quickly beyond the edge.
+            float edge = glm::max(glm::max(abs(ndc.x), abs(ndc.y)), 1.0f);
+            sunVisible = glm::clamp(edge <= 1.0f ? 1.0f : 1.0f / (1.0f + (edge - 1.0f) * 6.0f), 0.0f, 1.0f);
+
+            // Occlusion test: if any planet's sphere blocks the ray Camera->Sun,
+            // the flare is hidden (the planets are tiny, so this is subtle).
+            glm::vec3 camPos = camera.Position;
+            glm::vec3 toSun = sunPos - camPos;
+            float sunDist = glm::length(toSun);
+            glm::vec3 rayDir = sunDist > 1.0e-6f ? toSun / sunDist : glm::vec3(0.0f);
+            for (size_t i = 1; i < count; ++i) {
+                glm::vec3 center((float)positions[i].x, (float)positions[i].y, (float)positions[i].z);
+                float radius = (float)radii[i];
+                glm::vec3 oc = center - camPos;
+                float b = glm::dot(oc, rayDir);
+                if (b <= 0.0f || b >= sunDist) continue;          // behind camera or past the Sun
+                float c = glm::dot(oc, oc) - radius * radius;
+                float disc = b * b - c;
+                if (disc > 0.0f) {                                 // ray passes through the sphere
+                    float t = b - std::sqrt(disc);
+                    if (t > 0.0f && t < sunDist) {
+                        sunVisible = 0.0f;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Position in UV space (flip Y so it matches the screen's TexCoords).
+        float u = (clip.x / clip.w) * 0.5f + 0.5f;
+        float v = (clip.y / clip.w) * 0.5f + 0.5f;
+
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_ONE, GL_ONE);  // additive
+        glDepthMask(GL_FALSE);        // flare never writes depth
+        glDisable(GL_DEPTH_TEST);     // flare always draws on top; occlusion is CPU-side
+
+        flareShaderProgram.use();
+        flareShaderProgram.setVec2("sunPos", u, v);
+        flareShaderProgram.setFloat("sunVisible", sunVisible);
+        flareShaderProgram.setFloat("aspect", (float)width / (float)height);
+        // Boost so the halo reads clearly against the dark space background.
+        flareShaderProgram.setFloat("intensity", 1.0f);
+
+        quad.draw();
+
+        glDepthMask(GL_TRUE);
+        glEnable(GL_DEPTH_TEST); // restore
+        glDisable(GL_BLEND);
     }
 
     unsigned int Renderer::loadHDRTexture(const char* path) {

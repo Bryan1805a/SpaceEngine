@@ -16,6 +16,8 @@ namespace Graphics {
           orbitDistance(20.0f),
           orbitTheta(0.0f),
           orbitPhi(0.0f),
+          targetRadius(0.05f),
+          scrollAccum(0.0f),
           firstMouse(true),
           lastX(0.0f),
           lastY(0.0f),
@@ -46,19 +48,32 @@ namespace Graphics {
         // Mode 1: Lock Target
         // Camera follow planetary orbit
         if (lockedTargetIndex != -1) {
-            // W,S to narrow or widen the viewing distance
-            float zoomSpeed = MovementSpeed * 0.5f * deltaTime;
+            // W,S to narrow or widen the viewing distance.
+            // Zoom is exponential (logarithmic) so we can efficiently travel from
+            // the whole system (~100 AU) down to a single planet (~1e-4 AU).
+            float zoomRate = 0.6f * MovementSpeed * deltaTime;
             if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
-                orbitDistance -= zoomSpeed;
+                orbitDistance *= std::exp(-zoomRate);
             }
             if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
-                orbitDistance += zoomSpeed;
+                orbitDistance *= std::exp(zoomRate);
             }
-            if (orbitDistance < 2.0f) {
-                orbitDistance = 2.0f;
+
+            // Mouse wheel zoom (exponential, same feel as W/S)
+            if (scrollAccum != 0.0f) {
+                orbitDistance *= std::exp(-scrollAccum * 0.25f);
+                scrollAccum = 0.0f;
             }
-            if (orbitDistance > 500.0f) {
-                orbitDistance = 500.0f;
+
+            // Clamp so we can never dive inside the planet (radius + a small margin)
+            // but still reach deep orbit down to a tiny fraction of the planet's size.
+            float minDist = std::max(targetRadius * 2.0f, 1.0e-5f);
+            float maxDist = 120.0f; // comfortably outside the whole solar system
+            if (orbitDistance < minDist) {
+                orbitDistance = minDist;
+            }
+            if (orbitDistance > maxDist) {
+                orbitDistance = maxDist;
             }
 
             // If the cursor is hidden (space mode), allow orbit rotation
@@ -90,7 +105,11 @@ namespace Graphics {
         // Mode 2
         // Free-Fly
         else {
-            float moveSpeed = MovementSpeed * deltaTime;
+            // Scale movement speed to the current "view scale" so you can cruise
+            // across AU-scale distances yet still manoeuvre precisely around a
+            // planet. MovementSpeed is a user-set baseline (units/s).
+            float viewScale = clampViewScale();
+            float moveSpeed = MovementSpeed * viewScale * deltaTime;
             if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
                 Position += moveSpeed * Front;
             }
@@ -128,8 +147,9 @@ namespace Graphics {
         }
     }
 
-    void Camera::lockTarget(int entityIndex, float distance) {
+    void Camera::lockTarget(int entityIndex, float distance, float planetRadius) {
         lockedTargetIndex = entityIndex;
+        targetRadius = planetRadius;
         orbitDistance = distance;
         orbitTheta = 0.0f;
         orbitPhi = 0.0f;
@@ -171,5 +191,16 @@ namespace Graphics {
 
         Right = glm::normalize(glm::cross(Front, WorldUp));
         Up = glm::normalize(glm::cross(Right, Front));
+    }
+
+    float Camera::clampViewScale() const {
+        // Distance from the camera to the thing it's orbiting (or, when free-
+        // flying, a nominal scale). Larger scale -> faster traversal so the
+        // camera can cross AU distances in seconds; small scale -> slow,
+        // precise movement around a small planet.
+        float scale = (lockedTargetIndex != -1) ? orbitDistance : 1.0f;
+        if (scale < 5.0e-4f) scale = 5.0e-4f;
+        if (scale > 40.0f) scale = 40.0f;
+        return scale;
     }
 }
