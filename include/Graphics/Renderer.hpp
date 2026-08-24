@@ -71,9 +71,19 @@ namespace Graphics {
             mutable float viewNear;
             mutable float viewFar;
 
-            // New mesh for Earth
-            Mesh earthMesh;
-            unsigned int earthTexture; // Storing surface image
+            struct SubMeshMaterial {
+                unsigned int albedoMap = 0;
+                unsigned int specularMap = 0;
+                unsigned int emissionMap = 0;
+            };
+            struct PlanetAssets {
+                Mesh mesh;
+                std::vector<SubMeshMaterial> materials;
+            };
+
+            std::vector<PlanetAssets> planetAssets;
+            unsigned int defaultSpecularMap = 0;
+            unsigned int defaultEmissionMap = 0;
 
             // Orbit line
             Shader orbitShader;
@@ -95,7 +105,6 @@ namespace Graphics {
                                const std::vector<double>& radii) const;
             
             // Load texture
-            unsigned int earthAlbedo, earthSpecular, earthEmission;
             unsigned int loadTexture(const char* path);
         public:
             Renderer(int w, int h, const char* title);

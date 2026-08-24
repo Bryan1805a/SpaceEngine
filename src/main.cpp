@@ -205,6 +205,21 @@ int main() {
     neptune.radius = 1.6459e-4 * SCALE_GAS; // 24,622 km
     sim.addBody(neptune);
 
+    // Init Moon
+    Simulation::PlanetDesc moon;
+    moon.name = "Moon";
+    moon.type = Simulation::BodyType::ROCKY_PLANET;
+    moon.mass = 0.0123;
+    moon.position = earth.position + Vector3(0.00257, 0.0, 0.0); // 384,400 km
+    // Orbital velocity v = sqrt(G*M_earth / r). Add to Earth's velocity.
+    double v_moon = std::sqrt(SM_GRAVITY * earth.mass / 0.00257);
+    moon.velocity = earth.velocity + Vector3(0.0, 0.0, -v_moon);
+    moon.angularVelocity = glm::vec3(0.0f, 27.3f, 0.0f); // Tidally locked
+    moon.albedo = 0.12;
+    moon.greenhouse = 1.0;
+    moon.radius = 1.159e-5 * SCALE_ROCKY; // 1,737 km
+    sim.addBody(moon);
+
     // Init graphics
     Graphics::Renderer renderer(1280, 720, "SpaceEngine");
     std::cout << "Initialised 1000 asteroids" << std::endl;

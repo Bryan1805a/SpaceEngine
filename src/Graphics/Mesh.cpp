@@ -126,6 +126,18 @@ namespace Graphics {
         }
     }
 
+    void Mesh::drawSubMesh(size_t index, unsigned int mode) const {
+        if (index >= subMeshes.size()) return;
+        glBindVertexArray(VAO);
+        if (hasIndices) {
+            // Not implemented for indices yet
+            glDrawElements(mode, indexCount, GL_UNSIGNED_INT, 0);
+        }
+        else {
+            glDrawArrays(mode, subMeshes[index].vertexOffset, subMeshes[index].vertexCount);
+        }
+    }
+
     void Mesh::initOrbitLine(int segments) {
         std::vector<float> vertices;
         for (int i = 0; i < segments; ++i) {
@@ -173,8 +185,14 @@ namespace Graphics {
 
         std::vector<float> vertices;
 
+        subMeshes.clear();
+
         // Scan across all the polygons of the model
         for (size_t s = 0; s < shapes.size(); s++) {
+            SubMesh subMesh;
+            subMesh.name = shapes[s].name;
+            subMesh.vertexOffset = vertices.size() / 8;
+            
             for (size_t i = 0; i < shapes[s].mesh.indices.size(); i++) {
                 tinyobj::index_t idx = shapes[s].mesh.indices[i];
 
@@ -184,7 +202,6 @@ namespace Graphics {
                 vertices.push_back(attrib.vertices[3 * idx.vertex_index + 2]);
 
                 // Normal vector
-                // To calculate lighting and shadows
                 if (idx.normal_index >= 0) {
                     vertices.push_back(attrib.normals[3 * idx.normal_index + 0]);
                     vertices.push_back(attrib.normals[3 * idx.normal_index + 1]);
@@ -197,7 +214,6 @@ namespace Graphics {
                 }
 
                 // Image coordinates (UV/TexCoords)
-                // For mapping an image
                 if (idx.texcoord_index >= 0) {
                     vertices.push_back(attrib.texcoords[2 * idx.texcoord_index + 0]);
                     vertices.push_back(1.0f - attrib.texcoords[2 * idx.texcoord_index + 1]); // Flip Y to match OpenGL
@@ -207,6 +223,9 @@ namespace Graphics {
                     vertices.push_back(0.0f);
                 }
             }
+            
+            subMesh.vertexCount = (vertices.size() / 8) - subMesh.vertexOffset;
+            subMeshes.push_back(subMesh);
         }
 
         // Normalize vertices to radius 1.0 to match the math/physics engine

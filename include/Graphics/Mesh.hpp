@@ -4,12 +4,20 @@
 #include <cmath>
 
 namespace Graphics {
+    struct SubMesh {
+        std::string name;
+        unsigned int vertexOffset;
+        unsigned int vertexCount;
+    };
+
     class Mesh {
         public:
             unsigned int VAO, VBO, EBO;
             unsigned int indexCount;
             unsigned int vertexCount;
             bool hasIndices;
+            
+            std::vector<SubMesh> subMeshes;
 
             Mesh();
 
@@ -20,6 +28,7 @@ namespace Graphics {
             bool loadOBJ(const char* path);
 
             void draw(unsigned int mode = 0x0004) const;
+            void drawSubMesh(size_t index, unsigned int mode = 0x0004) const;
 
             // Clean VRAM
             void cleanup();

@@ -14,8 +14,22 @@
 #include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_opengl3.h>
 #include <stb_image.h>
+#include <iostream>
 
 namespace Graphics {
+    static unsigned int createColorTexture(unsigned char r, unsigned char g, unsigned char b, unsigned char a = 255) {
+        unsigned int textureID;
+        glGenTextures(1, &textureID);
+        glBindTexture(GL_TEXTURE_2D, textureID);
+        unsigned char data[4] = {r, g, b, a};
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        return textureID;
+    }
+
     // GLFW scroll callback: forwards mouse-wheel deltas to whichever Renderer owns
     // the window (looked up through the window user pointer, set in the ctor).
     static void scrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
@@ -90,10 +104,101 @@ namespace Graphics {
         hdrTexture = loadHDRTexture("assets/textures/skybox/HDR_multi_nebulae_1.hdr");
 
         // Load textures
-        earthMesh.loadOBJ("assets/models/earth.obj");
-        earthAlbedo = loadTexture("assets/textures/earth_albedo.jpg");
-        earthSpecular = loadTexture("assets/textures/earth_land_ocean_mask.png");
-        earthEmission = loadTexture("assets/textures/earth_night_lights_modified.png");
+        defaultSpecularMap = createColorTexture(25, 25, 25);
+        defaultEmissionMap = createColorTexture(0, 0, 0);
+
+        auto loadPlanet = [&](const char* objPath, const std::string& prefix) {
+            PlanetAssets pa;
+            pa.mesh.loadOBJ(objPath);
+            for (auto& sm : pa.mesh.subMeshes) {
+                SubMeshMaterial mat;
+                mat.specularMap = defaultSpecularMap;
+                mat.emissionMap = defaultEmissionMap;
+                
+                std::string albedoPath;
+                std::string specPath;
+                std::string emisPath;
+
+                // Pattern matching for submeshes
+                if (prefix == "mercury") {
+                    albedoPath = "assets/textures/mercury_diffuse.png";
+                } else if (prefix == "venus") {
+                    albedoPath = "assets/textures/venus_surface.jpg";
+                } else if (prefix == "earth") {
+                    albedoPath = "assets/textures/earth_albedo.jpg";
+                    specPath = "assets/textures/earth_land_ocean_mask.png";
+                    emisPath = "assets/textures/earth_night_lights_modified.png";
+                } else if (prefix == "mars") {
+                    albedoPath = "assets/textures/mars_baseColor.png";
+                    specPath = "assets/textures/mars_specularf0.png";
+                } else if (prefix == "jupiter") {
+                    if (sm.name.find("jupiter1") != std::string::npos) {
+                        albedoPath = "assets/textures/Uv1_jupiter1_diff.png";
+                        specPath = "assets/textures/Uv2_jupiter1_spec.png";
+                    } else {
+                        albedoPath = "assets/textures/Uv1_jupiter2_diff.png";
+                    }
+                } else if (prefix == "saturn") {
+                    if (sm.name.find("saturn1") != std::string::npos) {
+                        albedoPath = "assets/textures/saturn1_A_diffuse.png";
+                        specPath = "assets/textures/saturn1_A_specularGlossiness.png";
+                    } else if (sm.name.find("saturn2_B") != std::string::npos) {
+                        albedoPath = "assets/textures/saturn2_B_diffuse.png";
+                    } else if (sm.name.find("saturn2_A") != std::string::npos) {
+                        albedoPath = "assets/textures/saturn2_A_diffuse.png";
+                        specPath = "assets/textures/saturn2_A_specularGlossiness.png";
+                    } else if (sm.name.find("Mimas") != std::string::npos) {
+                        albedoPath = "assets/textures/saturn_Mimas_diffuse.png";
+                    } else if (sm.name.find("Enceladus") != std::string::npos) {
+                        albedoPath = "assets/textures/saturn_Enceladus_diffuse.png";
+                    }
+                } else if (prefix == "uranus") {
+                    if (sm.name.find("uranus1") != std::string::npos) {
+                        albedoPath = "assets/textures/uranus1_A_diffuse.png";
+                        specPath = "assets/textures/uranus1_A_specularGlossiness.png";
+                    } else if (sm.name.find("uranus2_B") != std::string::npos) {
+                        albedoPath = "assets/textures/uranus2_B_diffuse.png";
+                    } else if (sm.name.find("uranus2") != std::string::npos) {
+                        albedoPath = "assets/textures/uranus2_A_diffuse.png";
+                        specPath = "assets/textures/uranus2_A_specularGlossiness.png";
+                    } else if (sm.name.find("miranda") != std::string::npos) {
+                        albedoPath = "assets/textures/uranus_miranda_diffuse.png";
+                    }
+                } else if (prefix == "neptune") {
+                    if (sm.name.find("neptune1") != std::string::npos) {
+                        albedoPath = "assets/textures/neptune1_A_baseColor.png";
+                        specPath = "assets/textures/neptune1_A_specularf0.png";
+                    } else if (sm.name.find("neptune2_B") != std::string::npos) {
+                        albedoPath = "assets/textures/neptune2_B_baseColor.png";
+                    } else {
+                        albedoPath = "assets/textures/neptune2_A_baseColor.png";
+                    }
+                } else if (prefix == "moon") {
+                    albedoPath = "assets/textures/moon_baseColor.png";
+                    specPath = "assets/textures/moon_specularf0.png";
+                }
+
+                if (!albedoPath.empty()) mat.albedoMap = loadTexture(albedoPath.c_str());
+                if (!specPath.empty()) mat.specularMap = loadTexture(specPath.c_str());
+                if (!emisPath.empty()) mat.emissionMap = loadTexture(emisPath.c_str());
+
+                pa.materials.push_back(mat);
+            }
+            return pa;
+        };
+
+        // Note: The order must match main.cpp Simulation::addBody
+        // Sun(0), Mercury(1), Venus(2), Earth(3), Mars(4), Jupiter(5), Saturn(6), Uranus(7), Neptune(8), Moon(9)
+        planetAssets.push_back(PlanetAssets()); // Sun uses sphere
+        planetAssets.push_back(loadPlanet("assets/models/mercury.obj", "mercury"));
+        planetAssets.push_back(loadPlanet("assets/models/venus.obj", "venus"));
+        planetAssets.push_back(loadPlanet("assets/models/earth.obj", "earth"));
+        planetAssets.push_back(loadPlanet("assets/models/mars.obj", "mars"));
+        planetAssets.push_back(loadPlanet("assets/models/jupiter.obj", "jupiter"));
+        planetAssets.push_back(loadPlanet("assets/models/saturn.obj", "saturn"));
+        planetAssets.push_back(loadPlanet("assets/models/uranus.obj", "uranus"));
+        planetAssets.push_back(loadPlanet("assets/models/neptune.obj", "neptune"));
+        planetAssets.push_back(loadPlanet("assets/models/moon.obj", "moon"));
 
 
         // Init ImGui
@@ -277,8 +382,8 @@ namespace Graphics {
 
             shadowShaderProgram.setMat4("model", model);
             
-            if (i == 3) {
-                earthMesh.draw();
+            if (i < planetAssets.size() && planetAssets[i].mesh.vertexCount > 0) {
+                planetAssets[i].mesh.draw();
             } else {
                 sphere.draw();
             }
@@ -372,26 +477,27 @@ namespace Graphics {
             // Send this object's own model matrix to the GPU
             shaderProgram.setMat4("model", model);
 
-            if (i == 3) {
-                // Bind textures for Earth
-                glActiveTexture(GL_TEXTURE3);
-                glBindTexture(GL_TEXTURE_2D, earthAlbedo);
-                shaderProgram.setInt("albedoMap", 3);
-                
-                glActiveTexture(GL_TEXTURE4);
-                glBindTexture(GL_TEXTURE_2D, earthSpecular);
-                shaderProgram.setInt("specularMap", 4);
+            if (i < planetAssets.size() && planetAssets[i].mesh.vertexCount > 0) {
+                shaderProgram.setInt("isEarth", 1); // Triggers texture logic
+                for (size_t sm = 0; sm < planetAssets[i].mesh.subMeshes.size(); ++sm) {
+                    const auto& mat = planetAssets[i].materials[sm];
+                    
+                    glActiveTexture(GL_TEXTURE3);
+                    glBindTexture(GL_TEXTURE_2D, mat.albedoMap);
+                    shaderProgram.setInt("albedoMap", 3);
+                    
+                    glActiveTexture(GL_TEXTURE4);
+                    glBindTexture(GL_TEXTURE_2D, mat.specularMap);
+                    shaderProgram.setInt("specularMap", 4);
 
-                glActiveTexture(GL_TEXTURE5);
-                glBindTexture(GL_TEXTURE_2D, earthEmission);
-                shaderProgram.setInt("emissionMap", 5);
+                    glActiveTexture(GL_TEXTURE5);
+                    glBindTexture(GL_TEXTURE_2D, mat.emissionMap);
+                    shaderProgram.setInt("emissionMap", 5);
 
-                shaderProgram.setInt("isEarth", 1);
-                // Draw the earth mesh
-                earthMesh.draw();
+                    planetAssets[i].mesh.drawSubMesh(sm);
+                }
             } else {
                 shaderProgram.setInt("isEarth", 0);
-                // Draw the sphere mesh
                 sphere.draw();
             }
         }
