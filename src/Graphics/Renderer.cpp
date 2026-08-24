@@ -153,7 +153,7 @@ namespace Graphics {
                         albedoPath = "assets/textures/saturn_Enceladus_diffuse.png";
                     }
                 } else if (prefix == "uranus") {
-                    if (sm.name.find("uranus1") != std::string::npos) {
+                    if (sm.name.find("uranus1") != std::string::npos || sm.name == "0") {
                         albedoPath = "assets/textures/uranus1_A_diffuse.png";
                         specPath = "assets/textures/uranus1_A_specularGlossiness.png";
                     } else if (sm.name.find("uranus2_B") != std::string::npos) {

@@ -208,9 +208,19 @@ namespace Graphics {
                     vertices.push_back(attrib.normals[3 * idx.normal_index + 2]);
                 }
                 else {
-                    vertices.push_back(0.0f);
-                    vertices.push_back(1.0f);
-                    vertices.push_back(0.0f);
+                    float vx = attrib.vertices[3 * idx.vertex_index + 0];
+                    float vy = attrib.vertices[3 * idx.vertex_index + 1];
+                    float vz = attrib.vertices[3 * idx.vertex_index + 2];
+                    float len = std::sqrt(vx*vx + vy*vy + vz*vz);
+                    if (len > 1e-6f) {
+                        vertices.push_back(vx / len);
+                        vertices.push_back(vy / len);
+                        vertices.push_back(vz / len);
+                    } else {
+                        vertices.push_back(0.0f);
+                        vertices.push_back(1.0f);
+                        vertices.push_back(0.0f);
+                    }
                 }
 
                 // Image coordinates (UV/TexCoords)
