@@ -71,6 +71,10 @@ namespace Graphics {
             mutable float viewNear;
             mutable float viewFar;
 
+            // Orbit line
+            Shader orbitShader;
+            Mesh orbitMesh;
+
             // Create the shadow-map FBO and the UI-blur pingpong buffers
             void initFramebuffers();
 

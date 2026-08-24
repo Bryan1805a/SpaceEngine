@@ -184,6 +184,8 @@ namespace Graphics {
         skyboxShaderProgram = Shader("assets/shaders/skybox.vert", "assets/shaders/skybox.frag");
         shadowShaderProgram = Shader("assets/shaders/shadow.vert", "assets/shaders/shadow.frag", "assets/shaders/shadow.geom");
         flareShaderProgram = Shader("assets/shaders/screen.vert", "assets/shaders/flare.frag");
+        orbitShader = Shader("assets/shaders/orbit.vert", "assets/shaders/orbit.frag");
+        orbitMesh.initOrbitLine(120);
     }
 
     Renderer::~Renderer() {
@@ -195,6 +197,7 @@ namespace Graphics {
         // Clean CPU resources before closing window
         sphere.cleanup();
         quad.cleanup();
+        orbitMesh.cleanup();
         glDeleteFramebuffers(1, &depthMapFBO);
         glDeleteTextures(1, &depthCubemap);
         glDeleteFramebuffers(2, uiPingpongFBO);
@@ -206,6 +209,7 @@ namespace Graphics {
         glDeleteProgram(skyboxShaderProgram.ID);
         glDeleteProgram(shadowShaderProgram.ID);
         glDeleteProgram(flareShaderProgram.ID);
+        glDeleteProgram(orbitShader.ID);
 
         if (window) {
             glfwDestroyWindow(window);
@@ -358,6 +362,35 @@ namespace Graphics {
 
             // Draw the sphere mesh
             sphere.draw();
+        }
+
+        // Draw Orbits
+        if (count > 0) {
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            
+            orbitShader.use();
+            orbitShader.setMat4("projection", projection);
+            orbitShader.setMat4("view", view);
+
+            glm::vec3 sunPos((float)positions[0].x, (float)positions[0].y, (float)positions[0].z);
+            for (size_t i = 1; i < count; ++i) {
+                glm::vec3 pos((float)positions[i].x, (float)positions[i].y, (float)positions[i].z);
+                float dist = glm::length(pos - sunPos);
+                
+                glm::mat4 model = glm::translate(glm::mat4(1.0f), sunPos) * glm::scale(glm::mat4(1.0f), glm::vec3(dist));
+                orbitShader.setMat4("model", model);
+                
+                // Color based on body type
+                glm::vec4 orbitColor(0.5f, 0.5f, 0.5f, 0.25f);
+                if (types[i] == Simulation::BodyType::ROCKY_PLANET) orbitColor = glm::vec4(0.60f, 0.80f, 0.90f, 0.25f);
+                else if (types[i] == Simulation::BodyType::GAS_GIANT) orbitColor = glm::vec4(0.55f, 0.85f, 0.70f, 0.25f);
+                else if (types[i] == Simulation::BodyType::ICE_MOON) orbitColor = glm::vec4(0.70f, 0.85f, 1.00f, 0.25f);
+                
+                orbitShader.setVec4("orbitColor", orbitColor);
+                orbitMesh.draw(GL_LINE_LOOP);
+            }
+            glDisable(GL_BLEND);
         }
 
         // Draw Lens Flare on top of the scene (additive, screen-space)

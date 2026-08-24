@@ -113,14 +113,39 @@ namespace Graphics {
         glBindVertexArray(0);
     }
 
-    void Mesh::draw() const {
+    void Mesh::draw(unsigned int mode) const {
         glBindVertexArray(VAO);
         if (hasIndices) {
-            glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, 0);
+            glDrawElements(mode, indexCount, GL_UNSIGNED_INT, 0);
         }
         else {
-            glDrawArrays(GL_TRIANGLES, 0, vertexCount);
+            glDrawArrays(mode, 0, vertexCount);
         }
+    }
+
+    void Mesh::initOrbitLine(int segments) {
+        std::vector<float> vertices;
+        for (int i = 0; i < segments; ++i) {
+            float theta = 2.0f * 3.14159265359f * float(i) / float(segments);
+            vertices.push_back(std::cos(theta));
+            vertices.push_back(0.0f);
+            vertices.push_back(std::sin(theta));
+        }
+
+        vertexCount = segments;
+        hasIndices = false;
+
+        glGenVertexArrays(1, &VAO);
+        glGenBuffers(1, &VBO);
+
+        glBindVertexArray(VAO);
+        glBindBuffer(GL_ARRAY_BUFFER, VBO);
+        glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
+
+        // Coordinates only (3 floats)
+        // No normals or UVs
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FLOAT, 3 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(0);
     }
 
     void Mesh::cleanup() {

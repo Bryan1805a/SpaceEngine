@@ -16,8 +16,9 @@ namespace Graphics {
             // Geometric generation functions
             void initSphere(int sectorCount, int stackCount);
             void initQuad();
+            void initOrbitLine(int segments = 120);
 
-            void draw() const;
+            void draw(unsigned int mode = 0x0004) const;
 
             // Clean VRAM
             void cleanup();
