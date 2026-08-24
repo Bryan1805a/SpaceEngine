@@ -277,7 +277,7 @@ namespace Graphics {
 
             shadowShaderProgram.setMat4("model", model);
             
-            if (static_cast<int>(types[i]) == 1) {
+            if (i == 3) {
                 earthMesh.draw();
             } else {
                 sphere.draw();
@@ -372,7 +372,7 @@ namespace Graphics {
             // Send this object's own model matrix to the GPU
             shaderProgram.setMat4("model", model);
 
-            if (static_cast<int>(types[i]) == 1) {
+            if (i == 3) {
                 // Bind textures for Earth
                 glActiveTexture(GL_TEXTURE3);
                 glBindTexture(GL_TEXTURE_2D, earthAlbedo);
@@ -386,9 +386,11 @@ namespace Graphics {
                 glBindTexture(GL_TEXTURE_2D, earthEmission);
                 shaderProgram.setInt("emissionMap", 5);
 
+                shaderProgram.setInt("isEarth", 1);
                 // Draw the earth mesh
                 earthMesh.draw();
             } else {
+                shaderProgram.setInt("isEarth", 0);
                 // Draw the sphere mesh
                 sphere.draw();
             }
@@ -783,6 +785,7 @@ namespace Graphics {
             }
             else if (nrComponents == 3) {
                 format = GL_RGB;
+                glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
             }
             else if (nrComponents == 4) {
                 format = GL_RGBA;
@@ -791,6 +794,10 @@ namespace Graphics {
             glBindTexture(GL_TEXTURE_2D, textureID);
             glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
             glGenerateMipmap(GL_TEXTURE_2D); // Generate mipmaps to prevent noise in downscaled images
+
+            if (nrComponents == 3) {
+                glPixelStorei(GL_UNPACK_ALIGNMENT, 4); // Restore default
+            }
 
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);

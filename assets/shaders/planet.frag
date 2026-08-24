@@ -19,6 +19,8 @@ uniform float far_plane;
 uniform int bodyType;
 uniform float temperature;
 
+uniform int isEarth;
+
 // Check shadow mapping
 float ShadowCalculation(vec3 FragPos) {
     vec3 fragToLight = FragPos - lightPos;
@@ -73,7 +75,7 @@ void main() {
     vec3 emissionGlow = vec3(0.0); // Store self-illumination (like lava)
 
     // EARTH (Use Texture)
-    if (bodyType == 1) {
+    if (isEarth == 1) {
         // Read colors from an image
         vec3 albedo = texture(albedoMap, TexCoords).rgb;
         float specMask = texture(specularMap, TexCoords).r;
