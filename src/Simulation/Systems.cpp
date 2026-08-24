@@ -68,6 +68,14 @@ namespace Simulation {
     void CollisionSystem::resolve(World& world) {
         for (size_t i = 0; i < world.masses.size(); ++i) {
             for (size_t j = i + 1; j < world.masses.size(); ) {
+                // In our model, planets are visually scaled up immensely for visibility.
+                // This causes them to "collide" physically even when they are millions of km apart.
+                // To prevent moons and planets from merging, we restrict collisions to ASTEROIDS.
+                if (world.types[i] != BodyType::ASTEROID && world.types[j] != BodyType::ASTEROID) {
+                    ++j;
+                    continue;
+                }
+
                 // Calculate Collision Radius (explicit physical radius in AU)
                 double radiusI = world.radii[i];
                 double radiusJ = world.radii[j];
