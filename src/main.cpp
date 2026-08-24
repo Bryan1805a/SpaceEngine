@@ -7,6 +7,11 @@
 #include <Simulation/Simulation.hpp>
 #include <Graphics/Renderer.hpp>
 
+// Gravitational constant in AU^3 / (M_earth * Year^2) and the Sun's mass in M_earth.
+// Together they set the scale of every orbit: v_circular = sqrt(G*M_sun / a).
+constexpr double SM_GRAVITY = 0.000118549;
+constexpr double SM_SUN_MASS = 333000.0;
+
 int raycast(const glm::vec3& rayOrigin, const glm::vec3& rayDir, const std::vector<Vector3>& positions, const std::vector<double>& radii) {
     int hitIndex = -1;
     float minDistance = 999999.0f; // Find the nearest planet if the ray passes through multiple planets
@@ -71,18 +76,56 @@ int main() {
     // Reference frame:
     // G = 0.000118549 (AU^3 / (M_earth * Year^2))
     // dt = 0.001 (Approximately 0.365 days)
-    Simulation::System sim(0.000118549, 0.001);
+    Simulation::System sim(SM_GRAVITY, 0.001);
+
+    // Helper: circular orbital velocity v = sqrt(G*M_sun / a), so orbits stay stable.
+    // Everything orbits counter-clockwise in the X-Z plane (position on +X, velocity on -Z).
+    auto circularVelocity = [&](double semiMajorAxis) {
+        double v = std::sqrt(SM_GRAVITY * SM_SUN_MASS / semiMajorAxis);
+        return Vector3(0.0, 0.0, -v);
+    };
+
+    // Visual scaling factors for better visibility
+    const double SCALE_SUN = 20.0;
+    const double SCALE_ROCKY = 500.0;
+    const double SCALE_GAS = 100.0;
 
     // Init Sun
     Simulation::PlanetDesc sun;
     sun.name = "Sol";
     sun.type = Simulation::BodyType::STAR;
-    sun.mass = 333000.0;
+    sun.mass = SM_SUN_MASS;
     sun.position = Vector3::Zero;
     sun.velocity = Vector3::Zero;
     sun.angularVelocity = glm::vec3(0.0f, 10.0f, 0.0f);
-    sun.radius = 0.15;
+    sun.radius = 0.0046505 * SCALE_SUN; // 695,700 km
     sim.addBody(sun);
+
+    // Init Mercury
+    Simulation::PlanetDesc mercury;
+    mercury.name = "Mercury";
+    mercury.type = Simulation::BodyType::ROCKY_PLANET;
+    mercury.mass = 0.055;
+    mercury.position = Vector3(0.387, 0.0, 0.0);
+    mercury.velocity = circularVelocity(0.387);
+    mercury.angularVelocity = glm::vec3(0.0f, 365.0f, 0.0f);
+    mercury.albedo = 0.12;
+    mercury.greenhouse = 1.0;
+    mercury.radius = 1.6308e-5 * SCALE_ROCKY; // 2,439.7 km
+    sim.addBody(mercury);
+
+    // Init Venus
+    Simulation::PlanetDesc venus;
+    venus.name = "Venus";
+    venus.type = Simulation::BodyType::ROCKY_PLANET;
+    venus.mass = 0.815;
+    venus.position = Vector3(0.723, 0.0, 0.0);
+    venus.velocity = circularVelocity(0.723);
+    venus.angularVelocity = glm::vec3(0.0f, 365.0f, 0.0f);
+    venus.albedo = 0.65;                   // Shiny acid clouds
+    venus.greenhouse = 2.3;                // Runaway greenhouse -> ~700K
+    venus.radius = 4.0454e-5 * SCALE_ROCKY; // 6,051.8 km
+    sim.addBody(venus);
 
     // Init Earth
     Simulation::PlanetDesc earth;
@@ -90,11 +133,11 @@ int main() {
     earth.type = Simulation::BodyType::ROCKY_PLANET;
     earth.mass = 1.0;
     earth.position = Vector3(1.0, 0.0, 0.0); // At a distance of 1 AU from the Sun
-    earth.velocity = Vector3(0.0, 0.0, -6.28318); // 2*PI AU/Year
+    earth.velocity = circularVelocity(1.0);
     earth.angularVelocity = glm::vec3(0.0f, 365.0f, 0.0f); // Rotate 365/year
     earth.albedo = 0.30;
     earth.greenhouse = 1.13; // 255K -> 288K
-    earth.radius = 0.04;
+    earth.radius = 4.2588e-5 * SCALE_ROCKY; // 6,371 km
     sim.addBody(earth);
 
     // Init Mars
@@ -103,10 +146,11 @@ int main() {
     mars.type = Simulation::BodyType::ROCKY_PLANET;
     mars.mass = 0.107;
     mars.position = Vector3(1.524, 0.0, 0.0);
-    mars.velocity = Vector3(0.0, 0.0, -5.026);
+    mars.velocity = circularVelocity(1.524);
+    mars.angularVelocity = glm::vec3(0.0f, 365.0f, 0.0f);
     mars.albedo = 0.25;
     mars.greenhouse = 1.01;
-    mars.radius = 0.03;
+    mars.radius = 2.2657e-5 * SCALE_ROCKY; // 3,389.5 km
     sim.addBody(mars);
 
     // Init Jupiter
@@ -115,11 +159,51 @@ int main() {
     jupiter.type = Simulation::BodyType::GAS_GIANT;
     jupiter.mass = 317.8;
     jupiter.position = Vector3(5.204, 0.0, 0.0);
-    jupiter.velocity = Vector3(0.0, 0.0, -2.756);
+    jupiter.velocity = circularVelocity(5.204);
+    jupiter.angularVelocity = glm::vec3(0.0f, 365.0f, 0.0f);
     jupiter.albedo = 0.52; // Ammonia clouds are highly reflective
     jupiter.greenhouse = 1.0;
-    jupiter.radius = 0.10;
+    jupiter.radius = 4.6733e-4 * SCALE_GAS; // 69,911 km
     sim.addBody(jupiter);
+
+    // Init Saturn
+    Simulation::PlanetDesc saturn;
+    saturn.name = "Saturn";
+    saturn.type = Simulation::BodyType::GAS_GIANT;
+    saturn.mass = 95.16;
+    saturn.position = Vector3(9.58, 0.0, 0.0);
+    saturn.velocity = circularVelocity(9.58);
+    saturn.angularVelocity = glm::vec3(0.0f, 365.0f, 0.0f);
+    saturn.albedo = 0.47;
+    saturn.greenhouse = 1.0;
+    saturn.radius = 3.8926e-4 * SCALE_GAS; // 58,232 km
+    sim.addBody(saturn);
+
+    // Init Uranus
+    Simulation::PlanetDesc uranus;
+    uranus.name = "Uranus";
+    uranus.type = Simulation::BodyType::GAS_GIANT;
+    uranus.mass = 14.54;
+    uranus.position = Vector3(19.2, 0.0, 0.0);
+    uranus.velocity = circularVelocity(19.2);
+    uranus.angularVelocity = glm::vec3(0.0f, 365.0f, 0.0f);
+    uranus.albedo = 0.51;
+    uranus.greenhouse = 1.0;
+    uranus.radius = 1.6953e-4 * SCALE_GAS; // 25,362 km
+    sim.addBody(uranus);
+
+    // Init Neptune
+    Simulation::PlanetDesc neptune;
+    neptune.name = "Neptune";
+    neptune.type = Simulation::BodyType::GAS_GIANT;
+    neptune.mass = 17.15;
+    neptune.position = Vector3(30.05, 0.0, 0.0);
+    neptune.velocity = circularVelocity(30.05);
+    neptune.angularVelocity = glm::vec3(0.0f, 365.0f, 0.0f);
+    neptune.albedo = 0.41;
+    neptune.greenhouse = 1.0;
+    neptune.radius = 1.6459e-4 * SCALE_GAS; // 24,622 km
+    sim.addBody(neptune);
 
     // Init graphics
     Graphics::Renderer renderer(1280, 720, "SpaceEngine");
@@ -362,8 +446,12 @@ int main() {
 
                 ImGui::Spacing();
                 if (ImGui::Button("Track Orbit (Follow)", ImVec2(-1, 30))) {
-                    float viewDistance = (float)log10(sim.getMasses()[idx] + 1.0) * 8.0f + 5.0f;
-                    renderer.lockTarget(idx, viewDistance);
+                    // Start the orbit a few radii from the planet's surface; with true
+                    // scale that can be a tiny distance, which the camera handles via
+                    // its log zoom + adaptive near/far planes.
+                    float planetRadius = (float)bRadii[idx];
+                    float viewDistance = std::max(planetRadius * 6.0f, planetRadius + 1.0e-4f);
+                    renderer.lockTarget(idx, viewDistance, planetRadius);
                 }
                 if (renderer.isTargetLocked() && renderer.getLockedTargetIndex() == idx) {
                     if (ImGui::Button("Unlock Camera", ImVec2(-1, 30))) {
