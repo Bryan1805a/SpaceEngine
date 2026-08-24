@@ -18,11 +18,11 @@ void main() {
     float exposure = 1.0;
     vec3 mapped = vec3(1.0) - exp(-hdrColor * exposure);
 
-    // Vignette effect
-    vec2 center = TexCoords - vec2(0.5);
-    float dist = length(center);
-    float vignette = smoothstep(0.8, 0.2, dist);
-    mapped *= vignette;
+    // Vignette effect removed
+    // vec2 center = TexCoords - vec2(0.5);
+    // float dist = length(center);
+    // float vignette = smoothstep(0.8, 0.2, dist);
+    // mapped *= vignette;
 
     FragColor = vec4(mapped, 1.0);
 }

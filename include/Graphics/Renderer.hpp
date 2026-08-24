@@ -155,6 +155,7 @@ namespace Graphics {
 
             // Declare a function to expose the window to main.cpp for reading the ALT key
             GLFWwindow* getWindow() const {return window;}
+            unsigned int getUIBlurTexture() const { return uiPingpongColorbuffers[0]; }
 
             // Declare a function to calculate the ray direction
             glm::vec3 getRayDirection(float mouseX, float mouseY) const;
