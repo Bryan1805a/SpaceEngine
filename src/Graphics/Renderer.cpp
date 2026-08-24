@@ -779,24 +779,42 @@ namespace Graphics {
         unsigned char *data = stbi_load(path, &width, &height, &nrComponents, 0);
 
         if (data) {
-            GLenum format;
+            GLenum format = GL_RGBA;
+            bool needAlignmentFix = false;
+
             if (nrComponents == 1) {
                 format = GL_RED;
+                needAlignmentFix = true;
+            }
+            else if (nrComponents == 2) {
+                format = GL_RG;
+                needAlignmentFix = true;
             }
             else if (nrComponents == 3) {
                 format = GL_RGB;
-                glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+                needAlignmentFix = true;
             }
             else if (nrComponents == 4) {
                 format = GL_RGBA;
+            }
+
+            if (needAlignmentFix) {
+                glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
             }
 
             glBindTexture(GL_TEXTURE_2D, textureID);
             glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
             glGenerateMipmap(GL_TEXTURE_2D); // Generate mipmaps to prevent noise in downscaled images
 
-            if (nrComponents == 3) {
+            if (needAlignmentFix) {
                 glPixelStorei(GL_UNPACK_ALIGNMENT, 4); // Restore default
+            }
+
+            // For single-channel textures (e.g. grayscale masks), set the swizzle
+            // so that sampling .rgb returns (R,R,R) instead of (R,0,0).
+            if (nrComponents == 1) {
+                GLint swizzle[] = { GL_RED, GL_RED, GL_RED, GL_ONE };
+                glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA, swizzle);
             }
 
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
