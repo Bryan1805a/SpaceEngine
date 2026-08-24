@@ -10,6 +10,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/quaternion.hpp>
 #include <imgui.h>
 #include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_opengl3.h>
@@ -341,7 +343,7 @@ namespace Graphics {
         glfwSwapBuffers(window);
     }
 
-    void Renderer::draw(size_t count, const std::vector<Vector3>& positions, const std::vector<double>& radii, const std::vector<glm::quat>& orientations, const std::vector<Simulation::BodyType>& types, const std::vector<double>& temperatures) const {
+    void Renderer::draw(size_t count, const std::vector<Vector3>& positions, const std::vector<Vector3>& velocities, const std::vector<double>& radii, const std::vector<glm::quat>& orientations, const std::vector<Simulation::BodyType>& types, const std::vector<double>& temperatures) const {
         // Calculate 6 matrices from the Sun's perspective (90-degree field of view)
         float near_plane = 1.0f;
         float far_plane = 250.0f;
@@ -513,10 +515,32 @@ namespace Graphics {
 
             glm::vec3 sunPos((float)positions[0].x, (float)positions[0].y, (float)positions[0].z);
             for (size_t i = 1; i < count; ++i) {
+                // Determine the parent body (Sun = 0, Earth = 3 for Moon = 9)
+                size_t parentIdx = (i == 9) ? 3 : 0;
+                glm::vec3 parentPos((float)positions[parentIdx].x, (float)positions[parentIdx].y, (float)positions[parentIdx].z);
                 glm::vec3 pos((float)positions[i].x, (float)positions[i].y, (float)positions[i].z);
-                float dist = glm::length(pos - sunPos);
                 
-                glm::mat4 model = glm::translate(glm::mat4(1.0f), sunPos) * glm::scale(glm::mat4(1.0f), glm::vec3(dist));
+                glm::vec3 r = pos - parentPos;
+                float dist = glm::length(r);
+
+                glm::vec3 parentVel((float)velocities[parentIdx].x, (float)velocities[parentIdx].y, (float)velocities[parentIdx].z);
+                glm::vec3 vel((float)velocities[i].x, (float)velocities[i].y, (float)velocities[i].z);
+                glm::vec3 v = vel - parentVel;
+
+                // Angular momentum vector h = r x v is perpendicular to the orbital plane
+                glm::vec3 h = glm::cross(r, v);
+                if (glm::length(h) > 1e-6f) {
+                    h = glm::normalize(h);
+                } else {
+                    h = glm::vec3(0.0f, 1.0f, 0.0f); // Fallback
+                }
+
+                // Default orbit is in X-Z plane, so its normal is +Y. Rotate +Y to match h.
+                glm::vec3 up(0.0f, 1.0f, 0.0f);
+                glm::quat q = glm::rotation(up, h);
+                glm::mat4 rot = glm::mat4_cast(q);
+
+                glm::mat4 model = glm::translate(glm::mat4(1.0f), parentPos) * rot * glm::scale(glm::mat4(1.0f), glm::vec3(dist));
                 orbitShader.setMat4("model", model);
                 
                 // Color

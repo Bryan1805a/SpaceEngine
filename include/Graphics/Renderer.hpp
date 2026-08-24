@@ -125,6 +125,7 @@ namespace Graphics {
 
             void draw(size_t count,
                       const std::vector<Vector3>& positions,
+                      const std::vector<Vector3>& velocities,
                       const std::vector<double>& radii,
                       const std::vector<glm::quat>& orientations,
                       const std::vector<Simulation::BodyType>& types,

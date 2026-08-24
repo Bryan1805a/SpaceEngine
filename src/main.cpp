@@ -4,6 +4,7 @@
 #include <ctime>
 #include <imgui.h>
 #include <Math/Vector3.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <Simulation/Simulation.hpp>
 #include <Graphics/Renderer.hpp>
 
@@ -78,11 +79,31 @@ int main() {
     // dt = 0.001 (Approximately 0.365 days)
     Simulation::System sim(SM_GRAVITY, 0.001);
 
-    // Helper: circular orbital velocity v = sqrt(G*M_sun / a), so orbits stay stable.
-    // Everything orbits counter-clockwise in the X-Z plane (position on +X, velocity on -Z).
-    auto circularVelocity = [&](double semiMajorAxis) {
-        double v = std::sqrt(SM_GRAVITY * SM_SUN_MASS / semiMajorAxis);
-        return Vector3(0.0, 0.0, -v);
+    struct OrbitalElements {
+        Vector3 position;
+        Vector3 velocity;
+    };
+
+    auto calculateOrbit = [&](double semiMajorAxis, double incDeg, double lanDeg, double centralMass = SM_SUN_MASS) {
+        double v = std::sqrt(SM_GRAVITY * centralMass / semiMajorAxis);
+        
+        // Start with flat orbit on +X axis
+        glm::vec3 pos(semiMajorAxis, 0.0, 0.0);
+        glm::vec3 vel(0.0, 0.0, -v);
+        
+        // 1. Incline orbit around X axis
+        float incRad = glm::radians((float)incDeg);
+        glm::mat4 rotX = glm::rotate(glm::mat4(1.0f), incRad, glm::vec3(1.0f, 0.0f, 0.0f));
+        pos = glm::vec3(rotX * glm::vec4(pos, 1.0f));
+        vel = glm::vec3(rotX * glm::vec4(vel, 0.0f));
+
+        // 2. Rotate ascending node around Y axis (up)
+        float lanRad = glm::radians((float)lanDeg);
+        glm::mat4 rotY = glm::rotate(glm::mat4(1.0f), lanRad, glm::vec3(0.0f, 1.0f, 0.0f));
+        pos = glm::vec3(rotY * glm::vec4(pos, 1.0f));
+        vel = glm::vec3(rotY * glm::vec4(vel, 0.0f));
+
+        return OrbitalElements{Vector3(pos.x, pos.y, pos.z), Vector3(vel.x, vel.y, vel.z)};
     };
 
     // Visual scaling factors for better visibility
@@ -106,8 +127,9 @@ int main() {
     mercury.name = "Mercury";
     mercury.type = Simulation::BodyType::ROCKY_PLANET;
     mercury.mass = 0.055;
-    mercury.position = Vector3(0.387, 0.0, 0.0);
-    mercury.velocity = circularVelocity(0.387);
+    OrbitalElements orbMerc = calculateOrbit(0.387, 7.00, 48.33);
+    mercury.position = orbMerc.position;
+    mercury.velocity = orbMerc.velocity;
     mercury.angularVelocity = glm::vec3(0.0f, 365.0f, 0.0f);
     mercury.albedo = 0.12;
     mercury.greenhouse = 1.0;
@@ -119,8 +141,9 @@ int main() {
     venus.name = "Venus";
     venus.type = Simulation::BodyType::ROCKY_PLANET;
     venus.mass = 0.815;
-    venus.position = Vector3(0.723, 0.0, 0.0);
-    venus.velocity = circularVelocity(0.723);
+    OrbitalElements orbVen = calculateOrbit(0.723, 3.39, 76.68);
+    venus.position = orbVen.position;
+    venus.velocity = orbVen.velocity;
     venus.angularVelocity = glm::vec3(0.0f, 365.0f, 0.0f);
     venus.albedo = 0.65;                   // Shiny acid clouds
     venus.greenhouse = 2.3;                // Runaway greenhouse -> ~700K
@@ -132,8 +155,9 @@ int main() {
     earth.name = "Earth";
     earth.type = Simulation::BodyType::ROCKY_PLANET;
     earth.mass = 1.0;
-    earth.position = Vector3(1.0, 0.0, 0.0); // At a distance of 1 AU from the Sun
-    earth.velocity = circularVelocity(1.0);
+    OrbitalElements orbEarth = calculateOrbit(1.0, 0.0, -11.26);
+    earth.position = orbEarth.position;
+    earth.velocity = orbEarth.velocity;
     earth.angularVelocity = glm::vec3(0.0f, 365.0f, 0.0f); // Rotate 365/year
     earth.albedo = 0.30;
     earth.greenhouse = 1.13; // 255K -> 288K
@@ -145,8 +169,9 @@ int main() {
     mars.name = "Mars";
     mars.type = Simulation::BodyType::ROCKY_PLANET;
     mars.mass = 0.107;
-    mars.position = Vector3(1.524, 0.0, 0.0);
-    mars.velocity = circularVelocity(1.524);
+    OrbitalElements orbMars = calculateOrbit(1.524, 1.85, 49.58);
+    mars.position = orbMars.position;
+    mars.velocity = orbMars.velocity;
     mars.angularVelocity = glm::vec3(0.0f, 365.0f, 0.0f);
     mars.albedo = 0.25;
     mars.greenhouse = 1.01;
@@ -158,8 +183,9 @@ int main() {
     jupiter.name = "Jupiter";
     jupiter.type = Simulation::BodyType::GAS_GIANT;
     jupiter.mass = 317.8;
-    jupiter.position = Vector3(5.204, 0.0, 0.0);
-    jupiter.velocity = circularVelocity(5.204);
+    OrbitalElements orbJup = calculateOrbit(5.204, 1.30, 100.55);
+    jupiter.position = orbJup.position;
+    jupiter.velocity = orbJup.velocity;
     jupiter.angularVelocity = glm::vec3(0.0f, 365.0f, 0.0f);
     jupiter.albedo = 0.52; // Ammonia clouds are highly reflective
     jupiter.greenhouse = 1.0;
@@ -171,8 +197,9 @@ int main() {
     saturn.name = "Saturn";
     saturn.type = Simulation::BodyType::GAS_GIANT;
     saturn.mass = 95.16;
-    saturn.position = Vector3(9.58, 0.0, 0.0);
-    saturn.velocity = circularVelocity(9.58);
+    OrbitalElements orbSat = calculateOrbit(9.58, 2.48, 113.72);
+    saturn.position = orbSat.position;
+    saturn.velocity = orbSat.velocity;
     saturn.angularVelocity = glm::vec3(0.0f, 365.0f, 0.0f);
     saturn.albedo = 0.47;
     saturn.greenhouse = 1.0;
@@ -184,8 +211,9 @@ int main() {
     uranus.name = "Uranus";
     uranus.type = Simulation::BodyType::GAS_GIANT;
     uranus.mass = 14.54;
-    uranus.position = Vector3(19.2, 0.0, 0.0);
-    uranus.velocity = circularVelocity(19.2);
+    OrbitalElements orbUr = calculateOrbit(19.2, 0.77, 74.23);
+    uranus.position = orbUr.position;
+    uranus.velocity = orbUr.velocity;
     uranus.angularVelocity = glm::vec3(0.0f, 365.0f, 0.0f);
     uranus.albedo = 0.51;
     uranus.greenhouse = 1.0;
@@ -197,8 +225,9 @@ int main() {
     neptune.name = "Neptune";
     neptune.type = Simulation::BodyType::GAS_GIANT;
     neptune.mass = 17.15;
-    neptune.position = Vector3(30.05, 0.0, 0.0);
-    neptune.velocity = circularVelocity(30.05);
+    OrbitalElements orbNep = calculateOrbit(30.05, 1.77, 131.72);
+    neptune.position = orbNep.position;
+    neptune.velocity = orbNep.velocity;
     neptune.angularVelocity = glm::vec3(0.0f, 365.0f, 0.0f);
     neptune.albedo = 0.41;
     neptune.greenhouse = 1.0;
@@ -210,10 +239,9 @@ int main() {
     moon.name = "Moon";
     moon.type = Simulation::BodyType::ROCKY_PLANET;
     moon.mass = 0.0123;
-    moon.position = earth.position + Vector3(0.00257, 0.0, 0.0); // 384,400 km
-    // Orbital velocity v = sqrt(G*M_earth / r). Add to Earth's velocity.
-    double v_moon = std::sqrt(SM_GRAVITY * earth.mass / 0.00257);
-    moon.velocity = earth.velocity + Vector3(0.0, 0.0, -v_moon);
+    OrbitalElements orbMoon = calculateOrbit(0.00257, 5.14, 125.08, earth.mass);
+    moon.position = earth.position + orbMoon.position;
+    moon.velocity = earth.velocity + orbMoon.velocity;
     moon.angularVelocity = glm::vec3(0.0f, 27.3f, 0.0f); // Tidally locked
     moon.albedo = 0.12;
     moon.greenhouse = 1.0;
@@ -263,7 +291,7 @@ int main() {
         renderer.clear();
 
         // Upload objects into GPU
-        renderer.draw(sim.getBodyCount(), sim.getPositions(), sim.getRadii(),
+        renderer.draw(sim.getBodyCount(), sim.getPositions(), sim.getVelocities(), sim.getRadii(),
                       sim.getOrientations(), sim.getTypes(), sim.getTemperatures());
 
         // Draw UI
