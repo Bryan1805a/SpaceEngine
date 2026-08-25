@@ -31,7 +31,7 @@ namespace Physics {
         return octant;
     }
 
-    void Octree::insertImpl(int nodeIdx, int bodyIdx) {
+    void Octree::insertImpl(int nodeIdx, int bodyIdx, int depth) {
         OctreeNode& node = nodes[nodeIdx];
         Vector3 bodyPos = (*positions)[bodyIdx];
         double bodyMass = (*masses)[bodyIdx];
@@ -41,6 +41,14 @@ namespace Physics {
         double newTotalMass = node.totalMass + bodyMass;
         node.centerOfMass = (node.centerOfMass * node.totalMass + bodyPos * bodyMass) / newTotalMass;
         node.totalMass = newTotalMass;
+
+        // Degenerate case: bodies so close they cannot be separated by further
+        // subdivision. Their combined mass/center-of-mass is already recorded on
+        // this node, which is sufficient for the Barnes-Hut approximation (and a
+        // co-located body's self-attraction collapses to zero via the r==0 guard).
+        if (depth >= MAX_DEPTH) {
+            return;
+        }
 
         // If this node is Leaf
         if (node.isLeaf()) {
@@ -74,13 +82,13 @@ namespace Physics {
 
                 // Recursive to move the old body down
             int oldOctant = getOctant(nodes[nodeIdx].center, (*positions)[oldBodyIdx]);
-            insertImpl(nodes[nodeIdx].children[oldOctant], oldBodyIdx);
+            insertImpl(nodes[nodeIdx].children[oldOctant], oldBodyIdx, depth + 1);
         }
 
         // If this node is a branch
         // Move the new body down to another block
         int targetOctant = getOctant(nodes[nodeIdx].center, bodyPos);
-        insertImpl(nodes[nodeIdx].children[targetOctant], bodyIdx);
+        insertImpl(nodes[nodeIdx].children[targetOctant], bodyIdx, depth + 1);
     }
 
     void Octree::build() {

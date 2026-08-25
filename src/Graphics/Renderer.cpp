@@ -209,81 +209,77 @@ namespace Graphics {
         ImGuiIO& io = ImGui::GetIO(); (void)io;
 
         // Interface customization
-        // EVE Online-inspired tactical theme: sharp corners, translucent charcoal,
-        // dotted-grid accents, and electric cyan highlights.
-        ImGui::StyleColorsDark();
+        // Modern monochrome "floating window" theme: rounded corners, translucent
+        // white glass, hairline white borders, and no color accents.
+        ImGui::StyleColorsLight();
         ImGuiStyle& style = ImGui::GetStyle();
 
-        style.WindowRounding = 0.0f;
-        style.ChildRounding = 0.0f;
-        style.FrameRounding = 0.0f;
-        style.PopupRounding = 0.0f;
-        style.ScrollbarRounding = 0.0f;
-        style.GrabRounding = 0.0f;
-        style.TabRounding = 0.0f;
+        style.WindowRounding    = 12.0f;
+        style.ChildRounding     = 10.0f;
+        style.FrameRounding     = 8.0f;
+        style.PopupRounding     = 10.0f;
+        style.ScrollbarRounding = 8.0f;
+        style.GrabRounding      = 8.0f;
+        style.TabRounding       = 8.0f;
 
         style.WindowBorderSize = 1.0f;
-        style.ChildBorderSize = 1.0f;
-        style.FrameBorderSize = 0.0f;
-        style.PopupBorderSize = 1.0f;
+        style.ChildBorderSize  = 1.0f;
+        style.FrameBorderSize  = 0.0f;
+        style.PopupBorderSize  = 1.0f;
 
-        style.WindowPadding = ImVec2(8, 8);
-        style.FramePadding = ImVec2(6, 4);
-        style.ItemSpacing = ImVec2(6, 4);
-        style.ItemInnerSpacing = ImVec2(4, 4);
-        style.ScrollbarSize = 10.0f;
-        style.GrabMinSize = 8.0f;
+        style.WindowPadding    = ImVec2(14, 14);
+        style.FramePadding     = ImVec2(10, 6);
+        style.ItemSpacing      = ImVec2(10, 8);
+        style.ItemInnerSpacing = ImVec2(8, 6);
+        style.ScrollbarSize    = 12.0f;
+        style.GrabMinSize      = 10.0f;
+        style.WindowTitleAlign = ImVec2(0.5f, 0.5f);
 
-        // Palette: deep space slate / cyan
-        style.Colors[ImGuiCol_WindowBg]    = ImVec4(0.035f, 0.055f, 0.075f, 0.82f);
-        style.Colors[ImGuiCol_ChildBg]     = ImVec4(0.035f, 0.055f, 0.075f, 0.55f);
-        style.Colors[ImGuiCol_PopupBg]     = ImVec4(0.040f, 0.055f, 0.070f, 0.95f);
-        style.Colors[ImGuiCol_Border]      = ImVec4(0.20f, 0.55f, 0.75f, 0.55f);
-        style.Colors[ImGuiCol_BorderShadow]= ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
-
-        style.Colors[ImGuiCol_TitleBg]        = ImVec4(0.055f, 0.105f, 0.145f, 0.95f);
-        style.Colors[ImGuiCol_TitleBgActive]  = ImVec4(0.075f, 0.145f, 0.200f, 1.00f);
-        style.Colors[ImGuiCol_TitleBgCollapsed]= ImVec4(0.055f, 0.105f, 0.145f, 0.70f);
-
-        style.Colors[ImGuiCol_Text]         = ImVec4(0.82f, 0.89f, 0.94f, 1.00f);
-        style.Colors[ImGuiCol_TextDisabled] = ImVec4(0.35f, 0.45f, 0.52f, 1.00f);
-
-        style.Colors[ImGuiCol_FrameBg]        = ImVec4(0.045f, 0.075f, 0.100f, 0.85f);
-        style.Colors[ImGuiCol_FrameBgHovered] = ImVec4(0.070f, 0.125f, 0.165f, 0.90f);
-        style.Colors[ImGuiCol_FrameBgActive]  = ImVec4(0.100f, 0.170f, 0.220f, 0.95f);
-
-        style.Colors[ImGuiCol_Button]        = ImVec4(0.055f, 0.090f, 0.120f, 0.85f);
-        style.Colors[ImGuiCol_ButtonHovered] = ImVec4(0.100f, 0.200f, 0.280f, 0.95f);
-        style.Colors[ImGuiCol_ButtonActive]  = ImVec4(0.140f, 0.300f, 0.420f, 1.00f);
-
-        style.Colors[ImGuiCol_CheckMark]      = ImVec4(0.30f, 0.85f, 1.00f, 1.00f);
-        style.Colors[ImGuiCol_SliderGrab]     = ImVec4(0.20f, 0.60f, 0.85f, 1.00f);
-        style.Colors[ImGuiCol_SliderGrabActive] = ImVec4(0.30f, 0.80f, 1.00f, 1.00f);
-
-        style.Colors[ImGuiCol_Header]        = ImVec4(0.075f, 0.145f, 0.200f, 0.80f);
-        style.Colors[ImGuiCol_HeaderHovered] = ImVec4(0.100f, 0.210f, 0.290f, 0.90f);
-        style.Colors[ImGuiCol_HeaderActive]  = ImVec4(0.130f, 0.280f, 0.380f, 1.00f);
-
-        style.Colors[ImGuiCol_Separator]        = ImVec4(0.20f, 0.45f, 0.60f, 0.40f);
-        style.Colors[ImGuiCol_SeparatorHovered] = ImVec4(0.30f, 0.70f, 0.90f, 0.60f);
-        style.Colors[ImGuiCol_SeparatorActive]  = ImVec4(0.40f, 0.85f, 1.00f, 0.80f);
-
-        style.Colors[ImGuiCol_ScrollbarBg]        = ImVec4(0.035f, 0.050f, 0.065f, 0.80f);
-        style.Colors[ImGuiCol_ScrollbarGrab]      = ImVec4(0.15f, 0.30f, 0.40f, 0.80f);
-        style.Colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.20f, 0.45f, 0.60f, 0.90f);
-        style.Colors[ImGuiCol_ScrollbarGrabActive] = ImVec4(0.30f, 0.65f, 0.85f, 1.00f);
-
-        style.Colors[ImGuiCol_TableHeaderBg]        = ImVec4(0.060f, 0.110f, 0.150f, 0.95f);
-        style.Colors[ImGuiCol_TableBorderStrong]    = ImVec4(0.20f, 0.55f, 0.75f, 0.60f);
-        style.Colors[ImGuiCol_TableBorderLight]     = ImVec4(0.12f, 0.25f, 0.35f, 0.40f);
-        style.Colors[ImGuiCol_TableRowBg]           = ImVec4(0.040f, 0.065f, 0.085f, 0.50f);
-        style.Colors[ImGuiCol_TableRowBgAlt]        = ImVec4(0.055f, 0.085f, 0.110f, 0.50f);
-
-        style.Colors[ImGuiCol_Tab]           = ImVec4(0.055f, 0.090f, 0.120f, 0.90f);
-        style.Colors[ImGuiCol_TabHovered]    = ImVec4(0.100f, 0.200f, 0.280f, 0.95f);
-        style.Colors[ImGuiCol_TabSelected]   = ImVec4(0.100f, 0.240f, 0.330f, 1.00f);
-        style.Colors[ImGuiCol_TabUnfocused]  = ImVec4(0.040f, 0.065f, 0.085f, 0.80f);
-        style.Colors[ImGuiCol_TabUnfocusedActive] = ImVec4(0.075f, 0.145f, 0.200f, 0.90f);
+        // Monochrome palette: pure white accents over transparent glass.
+        style.Colors[ImGuiCol_Text]                  = ImVec4(1.00f, 1.00f, 1.00f, 0.95f);
+        style.Colors[ImGuiCol_TextDisabled]          = ImVec4(1.00f, 1.00f, 1.00f, 0.40f);
+        style.Colors[ImGuiCol_WindowBg]              = ImVec4(1.00f, 1.00f, 1.00f, 0.06f);
+        style.Colors[ImGuiCol_ChildBg]               = ImVec4(1.00f, 1.00f, 1.00f, 0.04f);
+        style.Colors[ImGuiCol_PopupBg]               = ImVec4(0.04f, 0.04f, 0.05f, 0.90f);
+        style.Colors[ImGuiCol_Border]                = ImVec4(1.00f, 1.00f, 1.00f, 0.22f);
+        style.Colors[ImGuiCol_BorderShadow]          = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+        style.Colors[ImGuiCol_FrameBg]               = ImVec4(1.00f, 1.00f, 1.00f, 0.08f);
+        style.Colors[ImGuiCol_FrameBgHovered]        = ImVec4(1.00f, 1.00f, 1.00f, 0.15f);
+        style.Colors[ImGuiCol_FrameBgActive]         = ImVec4(1.00f, 1.00f, 1.00f, 0.22f);
+        style.Colors[ImGuiCol_TitleBg]               = ImVec4(1.00f, 1.00f, 1.00f, 0.08f);
+        style.Colors[ImGuiCol_TitleBgActive]         = ImVec4(1.00f, 1.00f, 1.00f, 0.14f);
+        style.Colors[ImGuiCol_TitleBgCollapsed]      = ImVec4(1.00f, 1.00f, 1.00f, 0.06f);
+        style.Colors[ImGuiCol_ScrollbarBg]           = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+        style.Colors[ImGuiCol_ScrollbarGrab]         = ImVec4(1.00f, 1.00f, 1.00f, 0.25f);
+        style.Colors[ImGuiCol_ScrollbarGrabHovered]  = ImVec4(1.00f, 1.00f, 1.00f, 0.40f);
+        style.Colors[ImGuiCol_ScrollbarGrabActive]   = ImVec4(1.00f, 1.00f, 1.00f, 0.55f);
+        style.Colors[ImGuiCol_CheckMark]             = ImVec4(1.00f, 1.00f, 1.00f, 0.95f);
+        style.Colors[ImGuiCol_SliderGrab]            = ImVec4(1.00f, 1.00f, 1.00f, 0.85f);
+        style.Colors[ImGuiCol_SliderGrabActive]      = ImVec4(1.00f, 1.00f, 1.00f, 1.00f);
+        style.Colors[ImGuiCol_Button]                = ImVec4(1.00f, 1.00f, 1.00f, 0.10f);
+        style.Colors[ImGuiCol_ButtonHovered]         = ImVec4(1.00f, 1.00f, 1.00f, 0.18f);
+        style.Colors[ImGuiCol_ButtonActive]          = ImVec4(1.00f, 1.00f, 1.00f, 0.28f);
+        style.Colors[ImGuiCol_Header]                = ImVec4(1.00f, 1.00f, 1.00f, 0.08f);
+        style.Colors[ImGuiCol_HeaderHovered]         = ImVec4(1.00f, 1.00f, 1.00f, 0.16f);
+        style.Colors[ImGuiCol_HeaderActive]          = ImVec4(1.00f, 1.00f, 1.00f, 0.26f);
+        style.Colors[ImGuiCol_Separator]             = ImVec4(1.00f, 1.00f, 1.00f, 0.14f);
+        style.Colors[ImGuiCol_SeparatorHovered]      = ImVec4(1.00f, 1.00f, 1.00f, 0.26f);
+        style.Colors[ImGuiCol_SeparatorActive]       = ImVec4(1.00f, 1.00f, 1.00f, 0.42f);
+        style.Colors[ImGuiCol_ResizeGrip]            = ImVec4(1.00f, 1.00f, 1.00f, 0.20f);
+        style.Colors[ImGuiCol_ResizeGripHovered]     = ImVec4(1.00f, 1.00f, 1.00f, 0.40f);
+        style.Colors[ImGuiCol_ResizeGripActive]      = ImVec4(1.00f, 1.00f, 1.00f, 0.60f);
+        style.Colors[ImGuiCol_TableHeaderBg]         = ImVec4(1.00f, 1.00f, 1.00f, 0.08f);
+        style.Colors[ImGuiCol_TableBorderStrong]     = ImVec4(1.00f, 1.00f, 1.00f, 0.22f);
+        style.Colors[ImGuiCol_TableBorderLight]      = ImVec4(1.00f, 1.00f, 1.00f, 0.10f);
+        style.Colors[ImGuiCol_TableRowBg]            = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+        style.Colors[ImGuiCol_TableRowBgAlt]         = ImVec4(1.00f, 1.00f, 1.00f, 0.04f);
+        style.Colors[ImGuiCol_Tab]                   = ImVec4(1.00f, 1.00f, 1.00f, 0.06f);
+        style.Colors[ImGuiCol_TabHovered]            = ImVec4(1.00f, 1.00f, 1.00f, 0.16f);
+        style.Colors[ImGuiCol_TabSelected]           = ImVec4(1.00f, 1.00f, 1.00f, 0.22f);
+        style.Colors[ImGuiCol_TabUnfocused]          = ImVec4(1.00f, 1.00f, 1.00f, 0.06f);
+        style.Colors[ImGuiCol_TabUnfocusedActive]    = ImVec4(1.00f, 1.00f, 1.00f, 0.22f);
+        style.Colors[ImGuiCol_TextSelectedBg]        = ImVec4(1.00f, 1.00f, 1.00f, 0.28f);
+        style.Colors[ImGuiCol_NavHighlight]          = ImVec4(1.00f, 1.00f, 1.00f, 0.30f);
 
         // Connect backend
         ImGui_ImplGlfw_InitForOpenGL(window, true);
@@ -317,6 +313,19 @@ namespace Graphics {
         glDeleteFramebuffers(2, uiPingpongFBO);
         glDeleteTextures(2, uiPingpongColorbuffers);
         glDeleteTextures(1, &hdrTexture);
+
+        // Release the per-planet meshes and material textures (the default maps
+        // are shared across materials, but glDeleteTextures is idempotent).
+        for (auto& pa : planetAssets) {
+            pa.mesh.cleanup();
+            for (auto& m : pa.materials) {
+                glDeleteTextures(1, &m.albedoMap);
+                glDeleteTextures(1, &m.specularMap);
+                glDeleteTextures(1, &m.emissionMap);
+            }
+        }
+        glDeleteTextures(1, &defaultSpecularMap);
+        glDeleteTextures(1, &defaultEmissionMap);
         glDeleteProgram(shaderProgram.ID);
         glDeleteProgram(screenShaderProgram.ID);
         glDeleteProgram(blurShaderProgram.ID);
@@ -343,16 +352,36 @@ namespace Graphics {
         glfwSwapBuffers(window);
     }
 
-    void Renderer::draw(size_t count, const std::vector<Vector3>& positions, const std::vector<Vector3>& velocities, const std::vector<double>& radii, const std::vector<glm::quat>& orientations, const std::vector<Simulation::BodyType>& types, const std::vector<double>& temperatures) const {
+    void Renderer::draw(size_t count, const std::vector<Vector3>& positions, const std::vector<Vector3>& velocities, const std::vector<double>& radii, const std::vector<glm::quat>& orientations, const std::vector<Simulation::BodyType>& types, const std::vector<double>& temperatures, const std::vector<int>& assetIndices, const std::vector<int>& parentIds, const std::vector<int>& ids) const {
         // Calculate 6 matrices from the Sun's perspective (90-degree field of view)
         float near_plane = 1.0f;
         float far_plane = 250.0f;
         glm::mat4 shadowProj = glm::perspective(glm::radians(90.0f), 1.0f, near_plane, far_plane);
 
-        glm::vec3 lightPos(0.0f);
-        if (count > 0) {
-            lightPos = glm::vec3((float)positions[0].x, (float)positions[0].y, (float)positions[0].z);
+        // Locate the light source by type rather than assuming it is body 0, so
+        // lighting/shadow/flare stay correct after bodies are added or removed.
+        int sunIndex = -1;
+        for (size_t i = 0; i < count; ++i) {
+            if (types[i] == Simulation::BodyType::STAR) {
+                sunIndex = (int)i;
+                break;
+            }
         }
+
+        glm::vec3 lightPos(0.0f);
+        if (sunIndex >= 0) {
+            lightPos = glm::vec3((float)positions[sunIndex].x, (float)positions[sunIndex].y, (float)positions[sunIndex].z);
+        }
+
+        // Resolve a body index to its model assets, keyed by the stable asset
+        // index carried with each body (not the transient array position).
+        auto selectAssets = [&](size_t i) -> const PlanetAssets* {
+            int a = (i < assetIndices.size()) ? assetIndices[i] : -1;
+            if (a >= 0 && a < (int)planetAssets.size() && planetAssets[a].mesh.vertexCount > 0) {
+                return &planetAssets[a];
+            }
+            return nullptr;
+        };
 
         std::vector<glm::mat4> shadowTransforms;
         shadowTransforms.push_back(shadowProj * glm::lookAt(lightPos, lightPos + glm::vec3( 1.0, 0.0, 0.0), glm::vec3(0.0,-1.0, 0.0)));
@@ -376,16 +405,18 @@ namespace Graphics {
         shadowShaderProgram.setVec3("lightPos", lightPos);
 
         // Drawing loop
-        for (size_t i = 1; i < count; ++i) { // Exclude the Sun (i=0) because the Sun does not cast a shadow on itself
+        for (size_t i = 0; i < count; ++i) { // Exclude the Sun because it does not cast a shadow on itself
+            if ((int)i == sunIndex) continue;
             glm::mat4 model = glm::mat4(1.0f);
             glm::vec3 pos((float)positions[i].x, (float)positions[i].y, (float)positions[i].z);
             float radius = (float)radii[i];
             model = glm::translate(glm::mat4(1.0f), pos) * glm::mat4_cast(orientations[i]) * glm::scale(glm::mat4(1.0f), glm::vec3(radius));
 
             shadowShaderProgram.setMat4("model", model);
-            
-            if (i < planetAssets.size() && planetAssets[i].mesh.vertexCount > 0) {
-                planetAssets[i].mesh.draw();
+
+            const PlanetAssets* pa = selectAssets(i);
+            if (pa) {
+                pa->mesh.draw();
             } else {
                 sphere.draw();
             }
@@ -426,10 +457,8 @@ namespace Graphics {
         // Send camera position to the atmospheric (Fresnel) shader
         shaderProgram.setVec3("viewPos", camera.Position);
 
-        // // Send light source position (Fixed at the Star - position 0)
-        if (count > 0) {
-            shaderProgram.setVec3("lightPos", (float)positions[0].x, (float)positions[0].y, (float)positions[0].z);
-        }
+        // Send light source position (the host star, if any)
+        shaderProgram.setVec3("lightPos", lightPos.x, lightPos.y, lightPos.z);
 
         // Draw SKYBOX
         glDepthFunc(GL_LEQUAL);
@@ -479,10 +508,11 @@ namespace Graphics {
             // Send this object's own model matrix to the GPU
             shaderProgram.setMat4("model", model);
 
-            if (i < planetAssets.size() && planetAssets[i].mesh.vertexCount > 0) {
+            const PlanetAssets* pa = selectAssets(i);
+            if (pa) {
                 shaderProgram.setInt("isEarth", 1); // Triggers texture logic
-                for (size_t sm = 0; sm < planetAssets[i].mesh.subMeshes.size(); ++sm) {
-                    const auto& mat = planetAssets[i].materials[sm];
+                for (size_t sm = 0; sm < pa->mesh.subMeshes.size(); ++sm) {
+                    const auto& mat = pa->materials[sm];
                     
                     glActiveTexture(GL_TEXTURE3);
                     glBindTexture(GL_TEXTURE_2D, mat.albedoMap);
@@ -496,7 +526,7 @@ namespace Graphics {
                     glBindTexture(GL_TEXTURE_2D, mat.emissionMap);
                     shaderProgram.setInt("emissionMap", 5);
 
-                    planetAssets[i].mesh.drawSubMesh(sm);
+                    pa->mesh.drawSubMesh(sm);
                 }
             } else {
                 shaderProgram.setInt("isEarth", 0);
@@ -513,10 +543,24 @@ namespace Graphics {
             orbitShader.setMat4("projection", projection);
             orbitShader.setMat4("view", view);
 
-            glm::vec3 sunPos((float)positions[0].x, (float)positions[0].y, (float)positions[0].z);
-            for (size_t i = 1; i < count; ++i) {
-                // Determine the parent body (Sun = 0, Earth = 3 for Moon = 9)
-                size_t parentIdx = (i == 9) ? 3 : 0;
+            for (size_t i = 0; i < count; ++i) {
+                if ((int)i == sunIndex) continue; // The star itself has no orbit line
+
+                // Resolve the orbit parent: default to the host star, otherwise
+                // follow the stable parent id recorded with the body.
+                int parentIdx = sunIndex;
+                int pid = (i < parentIds.size()) ? parentIds[i] : -1;
+                if (pid != -1) {
+                    parentIdx = -1;
+                    for (size_t k = 0; k < ids.size(); ++k) {
+                        if (ids[k] == pid) {
+                            parentIdx = (int)k;
+                            break;
+                        }
+                    }
+                }
+                if (parentIdx < 0 || parentIdx >= (int)count) continue; // Parent removed
+
                 glm::vec3 parentPos((float)positions[parentIdx].x, (float)positions[parentIdx].y, (float)positions[parentIdx].z);
                 glm::vec3 pos((float)positions[i].x, (float)positions[i].y, (float)positions[i].z);
                 
@@ -553,7 +597,7 @@ namespace Graphics {
         }
 
         // Draw Lens Flare on top of the scene (additive, screen-space)
-        drawLensFlare(count, positions, radii);
+        drawLensFlare(count, positions, radii, sunIndex);
 
         // Apply Gaussian Blur for the UI frosted-glass background
         bool horizontal = true, first_iteration = true;
@@ -795,11 +839,12 @@ namespace Graphics {
         camera.updateTracking(positions);
     }
 
-    void Renderer::drawLensFlare(size_t count, const std::vector<Vector3>& positions, const std::vector<double>& radii) const {
-        if (count == 0) return;
+    void Renderer::drawLensFlare(size_t count, const std::vector<Vector3>& positions, const std::vector<double>& radii, int sunIndex) const {
+        if (count == 0 || sunIndex < 0 || sunIndex >= (int)count) return;
 
-        // The Sun is the first body (the star). Project its world position to UV.
-        glm::vec3 sunPos((float)positions[0].x, (float)positions[0].y, (float)positions[0].z);
+        // The host star projects a flare. Locate it by the passed index (resolved
+        // from body type in draw()), not by assuming it is body 0.
+        glm::vec3 sunPos((float)positions[sunIndex].x, (float)positions[sunIndex].y, (float)positions[sunIndex].z);
 
         glm::mat4 proj = glm::perspective(glm::radians(45.0f), (float)width / (float)height, viewNear, viewFar);
         glm::mat4 view = camera.getViewMatrix();
@@ -823,7 +868,8 @@ namespace Graphics {
             glm::vec3 toSun = sunPos - camPos;
             float sunDist = glm::length(toSun);
             glm::vec3 rayDir = sunDist > 1.0e-6f ? toSun / sunDist : glm::vec3(0.0f);
-            for (size_t i = 1; i < count; ++i) {
+            for (size_t i = 0; i < count; ++i) {
+                if ((int)i == sunIndex) continue;
                 glm::vec3 center((float)positions[i].x, (float)positions[i].y, (float)positions[i].z);
                 float radius = (float)radii[i];
                 glm::vec3 oc = center - camPos;
@@ -856,7 +902,7 @@ namespace Graphics {
         flareShaderProgram.setFloat("aspect", (float)width / (float)height);
         
         // Calculate the Sun's size in UV space based on perspective projection
-        float sunWorldRadius = (float)radii[0];
+        float sunWorldRadius = (float)radii[sunIndex];
         glm::vec3 toSun = sunPos - camera.Position;
         float fov = glm::radians(45.0f);
         float sunRadiusNDC = (sunWorldRadius / std::max(glm::length(toSun), 1.0e-6f)) / std::tan(fov * 0.5f);

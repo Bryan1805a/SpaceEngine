@@ -1,8 +1,10 @@
 #include <Simulation/World.hpp>
 
 namespace Simulation {
-    void World::addBody(const PlanetDesc& desc) {
+    int World::addBody(const PlanetDesc& desc) {
+        int id = nextId++;
         std::string entityName = desc.name.empty() ? ("Object #" + std::to_string(names.size())) : desc.name;
+        ids.push_back(id);
         names.push_back(entityName);
         masses.push_back(desc.mass);
         positions.push_back(desc.position);
@@ -18,6 +20,10 @@ namespace Simulation {
         greenhouses.push_back(desc.greenhouse);
         temperatures.push_back(desc.temperature);
         radii.push_back(desc.radius);
+
+        assetIndices.push_back(desc.assetIndex);
+        parentIds.push_back(desc.parentId);
+        return id;
     }
 
     void World::removeBody(size_t index) {
@@ -25,6 +31,7 @@ namespace Simulation {
 
         // Swap the last element with the element to be deleted
         size_t lastIdx = masses.size() - 1;
+        ids[index] = ids[lastIdx];
         names[index] = names[lastIdx];
         masses[index] = masses[lastIdx];
         positions[index] = positions[lastIdx];
@@ -37,8 +44,11 @@ namespace Simulation {
         greenhouses[index] = greenhouses[lastIdx];
         temperatures[index] = temperatures[lastIdx];
         radii[index] = radii[lastIdx];
+        assetIndices[index] = assetIndices[lastIdx];
+        parentIds[index] = parentIds[lastIdx];
 
         // Pop last index
+        ids.pop_back();
         names.pop_back();
         masses.pop_back();
         positions.pop_back();
@@ -51,6 +61,8 @@ namespace Simulation {
         greenhouses.pop_back();
         temperatures.pop_back();
         radii.pop_back();
+        assetIndices.pop_back();
+        parentIds.pop_back();
     }
 
     void World::resetAccelerations() {

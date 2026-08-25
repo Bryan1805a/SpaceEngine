@@ -23,8 +23,8 @@ namespace Simulation {
         public:
             System(double gravityConstant, double timeStep);
 
-            // Add a body to simulation
-            void addBody(const PlanetDesc& desc);
+            // Add a body to simulation (returns the assigned stable id)
+            int addBody(const PlanetDesc& desc);
             // Remove a body
             void removeBody(size_t index);
             // Execute a delta time jump t (Verlet Algorithm)
@@ -42,6 +42,11 @@ namespace Simulation {
             const std::vector<double>& getTemperatures() const { return world.temperatures; }
             const std::vector<BodyType>& getTypes() const { return world.types; }
             const std::vector<double>& getRadii() const { return world.radii; }
+
+            // Stable identity & render hints
+            const std::vector<int>& getIds() const { return world.ids; }
+            const std::vector<int>& getAssetIndices() const { return world.assetIndices; }
+            const std::vector<int>& getParentIds() const { return world.parentIds; }
 
             // Change delta time function
             void setDt(double newDt) { dt = newDt; }

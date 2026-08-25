@@ -102,7 +102,8 @@ namespace Graphics {
             // Renders on top of the scene using additive blending.
             void drawLensFlare(size_t count,
                                const std::vector<Vector3>& positions,
-                               const std::vector<double>& radii) const;
+                               const std::vector<double>& radii,
+                               int sunIndex) const;
             
             // Load texture
             unsigned int loadTexture(const char* path);
@@ -129,7 +130,10 @@ namespace Graphics {
                       const std::vector<double>& radii,
                       const std::vector<glm::quat>& orientations,
                       const std::vector<Simulation::BodyType>& types,
-                      const std::vector<double>& temperatures) const;
+                      const std::vector<double>& temperatures,
+                      const std::vector<int>& assetIndices,
+                      const std::vector<int>& parentIds,
+                      const std::vector<int>& ids) const;
 
             void processInput(float deltaTime); // Function to read keyboard and mouse input for movement
 

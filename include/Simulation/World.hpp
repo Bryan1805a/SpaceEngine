@@ -19,6 +19,12 @@ namespace Simulation {
         double greenhouse = 1.0;
         double temperature = 0.0;
         double radius = 0.05;
+
+        // Stable identity & render hints. These must travel with the body through
+        // add/remove/merge (swap-and-pop) so the renderer never relies on the
+        // transient array index.
+        int assetIndex = -1; // Index into Renderer::planetAssets (-1 = procedural sphere)
+        int parentId = -1;   // Stable id of the orbit-line parent (-1 = orbit the host star)
     };
 
     class World {
@@ -39,10 +45,18 @@ namespace Simulation {
         std::vector<double> temperatures;
         std::vector<double> radii;
 
+        // Stable per-body identity and render hints (survive swap-and-pop).
+        std::vector<int> ids;          // Unique, monotonically increasing identity
+        std::vector<int> assetIndices; // Renderer model index (-1 = procedural sphere)
+        std::vector<int> parentIds;    // Stable id of the orbit-line parent (-1 = star)
+
         // Basic lifecycle management functions
-        void addBody(const PlanetDesc& desc);
+        int addBody(const PlanetDesc& desc); // Returns the assigned stable id
         void removeBody(size_t index);
         size_t getBodyCount() const { return masses.size(); }
         void resetAccelerations();
+
+    private:
+        int nextId = 0;
     };
 }

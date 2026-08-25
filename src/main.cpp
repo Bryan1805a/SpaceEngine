@@ -26,8 +26,28 @@ void DrawAcrylicBackground(const Graphics::Renderer& renderer) {
 
     ImVec2 uv_min(p_min.x / sw, 1.0f - p_min.y / sh);
     ImVec2 uv_max(p_max.x / sw, 1.0f - p_max.y / sh);
-    
-    drawList->AddImage((ImTextureID)(intptr_t)renderer.getUIBlurTexture(), p_min, p_max, uv_min, uv_max);
+
+    float rounding = ImGui::GetStyle().WindowRounding;
+
+    // Soft drop shadow behind the floating window, drawn into the background
+    // draw list so it can extend outside the window's own clip rect.
+    ImDrawList* bg = ImGui::GetBackgroundDrawList();
+    const int shadowLayers = 6;
+    for (int i = 0; i < shadowLayers; ++i) {
+        float t = (float)i / (float)(shadowLayers - 1);
+        float spread = 1.0f + t * 8.0f;
+        float alpha = 0.10f * (1.0f - t);
+        ImVec2 off(0.0f, spread * 0.6f);
+        bg->AddRectFilled(ImVec2(p_min.x - spread, p_min.y - spread + off.y),
+                          ImVec2(p_max.x + spread, p_max.y + spread + off.y),
+                          IM_COL32(0, 0, 0, (int)(alpha * 255.0f)),
+                          rounding + spread);
+    }
+
+    // Frosted-glass panel with rounded corners.
+    drawList->AddImageRounded((ImTextureID)(intptr_t)renderer.getUIBlurTexture(),
+                              p_min, p_max, uv_min, uv_max,
+                              IM_COL32(255, 255, 255, 255), rounding);
 }
 
 int raycast(const glm::vec3& rayOrigin, const glm::vec3& rayDir, const std::vector<Vector3>& positions, const std::vector<double>& radii) {
@@ -68,15 +88,15 @@ const char* bodyTypeName(Simulation::BodyType type) {
     }
 }
 
-// EVE-style accent colour per body type
+// Monochrome white shades per body type (brightness conveys hierarchy only).
 ImVec4 bodyTypeColor(Simulation::BodyType type) {
     switch (type) {
-        case Simulation::BodyType::STAR: return ImVec4(1.00f, 0.80f, 0.30f, 1.0f);
-        case Simulation::BodyType::ROCKY_PLANET: return ImVec4(0.60f, 0.80f, 0.90f, 1.0f);
-        case Simulation::BodyType::GAS_GIANT: return ImVec4(0.55f, 0.85f, 0.70f, 1.0f);
-        case Simulation::BodyType::ICE_MOON: return ImVec4(0.70f, 0.85f, 1.00f, 1.0f);
-        case Simulation::BodyType::ASTEROID: return ImVec4(0.55f, 0.55f, 0.60f, 1.0f);
-        default: return ImVec4(0.70f, 0.70f, 0.70f, 1.0f);
+        case Simulation::BodyType::STAR: return ImVec4(1.00f, 1.00f, 1.00f, 1.0f);
+        case Simulation::BodyType::ROCKY_PLANET: return ImVec4(0.90f, 0.90f, 0.90f, 1.0f);
+        case Simulation::BodyType::GAS_GIANT: return ImVec4(0.80f, 0.80f, 0.80f, 1.0f);
+        case Simulation::BodyType::ICE_MOON: return ImVec4(0.72f, 0.72f, 0.72f, 1.0f);
+        case Simulation::BodyType::ASTEROID: return ImVec4(0.60f, 0.60f, 0.60f, 1.0f);
+        default: return ImVec4(0.80f, 0.80f, 0.80f, 1.0f);
     }
 }
 
@@ -151,6 +171,7 @@ int main() {
     mercury.albedo = 0.12;
     mercury.greenhouse = 1.0;
     mercury.radius = 1.6308e-5 * SCALE_ROCKY; // 2,439.7 km
+    mercury.assetIndex = 1;
     sim.addBody(mercury);
 
     // Init Venus
@@ -165,6 +186,7 @@ int main() {
     venus.albedo = 0.65;                   // Shiny acid clouds
     venus.greenhouse = 2.3;                // Runaway greenhouse -> ~700K
     venus.radius = 4.0454e-5 * SCALE_ROCKY; // 6,051.8 km
+    venus.assetIndex = 2;
     sim.addBody(venus);
 
     // Init Earth
@@ -179,7 +201,8 @@ int main() {
     earth.albedo = 0.30;
     earth.greenhouse = 1.13; // 255K -> 288K
     earth.radius = 4.2588e-5 * SCALE_ROCKY; // 6,371 km
-    sim.addBody(earth);
+    earth.assetIndex = 3;
+    int earthId = sim.addBody(earth);
 
     // Init Mars
     Simulation::PlanetDesc mars;
@@ -193,6 +216,7 @@ int main() {
     mars.albedo = 0.25;
     mars.greenhouse = 1.01;
     mars.radius = 2.2657e-5 * SCALE_ROCKY; // 3,389.5 km
+    mars.assetIndex = 4;
     sim.addBody(mars);
 
     // Init Jupiter
@@ -207,6 +231,7 @@ int main() {
     jupiter.albedo = 0.52; // Ammonia clouds are highly reflective
     jupiter.greenhouse = 1.0;
     jupiter.radius = 4.6733e-4 * SCALE_GAS; // 69,911 km
+    jupiter.assetIndex = 5;
     sim.addBody(jupiter);
 
     // Init Saturn
@@ -221,6 +246,7 @@ int main() {
     saturn.albedo = 0.47;
     saturn.greenhouse = 1.0;
     saturn.radius = 3.8926e-4 * SCALE_GAS; // 58,232 km
+    saturn.assetIndex = 6;
     sim.addBody(saturn);
 
     // Init Uranus
@@ -235,6 +261,7 @@ int main() {
     uranus.albedo = 0.51;
     uranus.greenhouse = 1.0;
     uranus.radius = 1.6953e-4 * SCALE_GAS; // 25,362 km
+    uranus.assetIndex = 7;
     sim.addBody(uranus);
 
     // Init Neptune
@@ -249,6 +276,7 @@ int main() {
     neptune.albedo = 0.41;
     neptune.greenhouse = 1.0;
     neptune.radius = 1.6459e-4 * SCALE_GAS; // 24,622 km
+    neptune.assetIndex = 8;
     sim.addBody(neptune);
 
     // Init Moon
@@ -263,14 +291,17 @@ int main() {
     moon.albedo = 0.12;
     moon.greenhouse = 1.0;
     moon.radius = 1.159e-5 * SCALE_ROCKY; // 1,737 km
+    moon.assetIndex = 9;
+    moon.parentId = earthId; // Orbit line around Earth, not the Sun
     sim.addBody(moon);
 
     // Init graphics
     Graphics::Renderer renderer(1280, 720, "SpaceEngine");
-    std::cout << "Initialised 1000 asteroids" << std::endl;
-    std::cout << "Press X to quit" << std::endl;
+    std::cout << "Initialised Solar System (10 bodies)" << std::endl;
+    std::cout << "Press ESC to quit" << std::endl;
     std::cout << "Press F11 to toggle fullscreen" << std::endl;
     std::cout << "Press TAB to toggle the UI cursor (or hold ALT while flying)" << std::endl;
+    std::cout << "Press H to toggle the HUD" << std::endl;
 
     // Delta Time vars
     float deltaTime = 0.0f;
@@ -311,7 +342,8 @@ int main() {
 
         // Upload objects into GPU
         renderer.draw(sim.getBodyCount(), sim.getPositions(), sim.getVelocities(), sim.getRadii(),
-                      sim.getOrientations(), sim.getTypes(), sim.getTemperatures());
+                      sim.getOrientations(), sim.getTypes(), sim.getTemperatures(),
+                      sim.getAssetIndices(), sim.getParentIds(), sim.getIds());
 
         // Draw UI
         renderer.beginUI();
@@ -326,6 +358,7 @@ int main() {
         const std::vector<double>& bRadii = sim.getRadii();
         const std::vector<double>& bTemp = sim.getTemperatures();
         const std::vector<Simulation::BodyType>& bTypes = sim.getTypes();
+        const std::vector<int>& bIds = sim.getIds();
 
         // Handle H key toggle for UI
         bool hPressed = ImGui::IsKeyDown(ImGuiKey_H);
@@ -342,7 +375,7 @@ int main() {
             ImGui::Begin("SpaceEngine Settings", nullptr, ImGuiWindowFlags_NoCollapse);
             DrawAcrylicBackground(renderer);
             
-            ImGui::TextColored(ImVec4(0.5f, 0.8f, 1.0f, 1.0f), "Simulation Time");
+            ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 0.85f), "Simulation Time");
             ImGui::SliderFloat("Time Scale", &timeScale, 0.0f, 5.0f, "%.2fx");
             if (ImGui::Button("Reset Time")) timeScale = 1.0f;
             ImGui::SameLine();
@@ -350,12 +383,12 @@ int main() {
             
             ImGui::Spacing(); ImGui::Separator(); ImGui::Spacing();
             
-            ImGui::TextColored(ImVec4(0.5f, 0.8f, 1.0f, 1.0f), "Camera");
+            ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 0.85f), "Camera");
             ImGui::SliderFloat("Speed", &renderer.getCameraSpeed(), 1.0f, 500.0f, "%.1f units/s");
             
             ImGui::Spacing(); ImGui::Separator(); ImGui::Spacing();
             
-            ImGui::TextColored(ImVec4(0.5f, 0.8f, 1.0f, 1.0f), "System Information");
+            ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 0.85f), "System Information");
             ImGui::Text("Bodies: %zu", sim.getBodyCount());
             ImGui::Text("FPS: %.0f", ImGui::GetIO().Framerate);
 
@@ -387,7 +420,7 @@ int main() {
             if (ImGui::BeginPopupContextWindow("PanelContextMenu")) {
                 if (ImGui::MenuItem("Select All")) {
                     for (size_t i = 0; i < bNames.size(); ++i) {
-                        selectedEntities.insert((int)i);
+                        selectedEntities.insert(bIds[i]);
                     }
                 }
                 if (ImGui::MenuItem("Deselect All")) {
@@ -396,31 +429,36 @@ int main() {
                 ImGui::EndPopup();
             }
 
+            // Removals are deferred until after the list loop, because
+            // removeBody() swap-and-pops the vector and would otherwise disturb
+            // this iteration (skipping the entry that was moved into place).
+            std::vector<int> pendingRemovals;
+
             ImGui::BeginChild("List", ImVec2(0, 0), true);
             for (size_t i = 0; i < bNames.size(); ++i) {
                 ImGui::PushID((int)i);
                 
                 ImVec4 color = bodyTypeColor(bTypes[i]);
                 ImGui::PushStyleColor(ImGuiCol_Text, color);
-                bool isSelected = selectedEntities.count((int)i) > 0;
+                bool isSelected = selectedEntities.count(bIds[i]) > 0;
                 
                 if (ImGui::Selectable(bNames[i].c_str(), isSelected)) {
                     if (!ImGui::GetIO().KeyCtrl) {
                         selectedEntities.clear();
                     }
                     if (isSelected && ImGui::GetIO().KeyCtrl) {
-                        selectedEntities.erase((int)i);
+                        selectedEntities.erase(bIds[i]);
                     } else {
-                        selectedEntities.insert((int)i);
+                        selectedEntities.insert(bIds[i]);
                     }
                 }
                 ImGui::PopStyleColor();
 
                 // Right-click context menu
                 if (ImGui::BeginPopupContextItem("Context Menu")) {
-                    if (selectedEntities.find((int)i) == selectedEntities.end()) {
+                    if (selectedEntities.find(bIds[i]) == selectedEntities.end()) {
                         selectedEntities.clear();
-                        selectedEntities.insert((int)i);
+                        selectedEntities.insert(bIds[i]);
                     }
                     
                     ImGui::TextColored(color, "%s", bNames[i].c_str());
@@ -442,8 +480,9 @@ int main() {
                         if (renderer.isTargetLocked() && renderer.getLockedTargetIndex() == (int)i) {
                             renderer.unlockTarget();
                         }
-                        sim.removeBody(i);
-                        selectedEntities.erase((int)i);
+                        int erasedId = bIds[i];
+                        selectedEntities.erase(erasedId);
+                        pendingRemovals.push_back(erasedId);
                     }
                     ImGui::EndPopup();
                 }
@@ -451,10 +490,10 @@ int main() {
                 // Show basic info if selected
                 if (isSelected) {
                     ImGui::Indent();
-                    ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "Type: %s", bodyTypeName(bTypes[i]));
-                    ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "Mass: %.2f M_E", bMass[i]);
+                    ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 0.75f), "Type: %s", bodyTypeName(bTypes[i]));
+                    ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 0.75f), "Mass: %.2f M_E", bMass[i]);
                     float distAU = glm::length(glm::vec3((float)bPos[i].x, (float)bPos[i].y, (float)bPos[i].z) - renderer.getCameraPos());
-                    ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "Distance: %.3f AU", distAU);
+                    ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 0.75f), "Distance: %.3f AU", distAU);
                     ImGui::Unindent();
                 }
                 
@@ -463,9 +502,28 @@ int main() {
             ImGui::EndChild();
             ImGui::End();
 
+            // Apply deferred removals now that the list iteration is finished.
+            // Resolve each pending id to its current index (ids survive the swap-
+            // and-pop, indices do not) and remove the body.
+            for (int rmId : pendingRemovals) {
+                for (size_t k = 0; k < bIds.size(); ++k) {
+                    if (bIds[k] == rmId) {
+                        sim.removeBody(k);
+                        break;
+                    }
+                }
+            }
+
             // Draw HUD reticles in the background draw list
             ImDrawList* drawList = ImGui::GetBackgroundDrawList();
-            for (int idx : selectedEntities) {
+            for (int selId : selectedEntities) {
+                int idx = -1;
+                for (size_t k = 0; k < bIds.size(); ++k) {
+                    if (bIds[k] == selId) {
+                        idx = (int)k;
+                        break;
+                    }
+                }
                 if (idx < 0 || idx >= (int)bPos.size()) continue;
                 glm::vec2 screenPos;
                 float distToCam;
@@ -473,7 +531,7 @@ int main() {
                 if (renderer.worldToScreen(p, screenPos, distToCam)) {
                     // Draw square reticle
                     float size = 20.0f;
-                    ImU32 reticleColor = IM_COL32(100, 255, 100, 200); // Greenish
+                    ImU32 reticleColor = IM_COL32(255, 255, 255, 220);
                     
                     // Top-left
                     drawList->AddLine(ImVec2(screenPos.x - size, screenPos.y - size), ImVec2(screenPos.x - size + 8, screenPos.y - size), reticleColor, 2.0f);
@@ -489,16 +547,16 @@ int main() {
                     drawList->AddLine(ImVec2(screenPos.x + size, screenPos.y + size), ImVec2(screenPos.x + size, screenPos.y + size - 8), reticleColor, 2.0f);
                     
                     // Circular HUD indicator in center
-                    drawList->AddCircle(ImVec2(screenPos.x, screenPos.y), 4.0f, IM_COL32(100, 255, 100, 255), 12, 1.5f);
-                    drawList->AddCircle(ImVec2(screenPos.x, screenPos.y), 12.0f, IM_COL32(100, 255, 100, 100), 24, 1.0f);
+                    drawList->AddCircle(ImVec2(screenPos.x, screenPos.y), 4.0f, IM_COL32(255, 255, 255, 255), 12, 1.5f);
+                    drawList->AddCircle(ImVec2(screenPos.x, screenPos.y), 12.0f, IM_COL32(255, 255, 255, 90), 24, 1.0f);
                     
                     // Name label
-                    drawList->AddText(ImVec2(screenPos.x + size + 4, screenPos.y - size), IM_COL32(200, 255, 200, 255), bNames[idx].c_str());
+                    drawList->AddText(ImVec2(screenPos.x + size + 4, screenPos.y - size), IM_COL32(255, 255, 255, 255), bNames[idx].c_str());
                     
                     // Distance label
                     char distStr[32];
                     snprintf(distStr, sizeof(distStr), "%.3f AU", distToCam);
-                    drawList->AddText(ImVec2(screenPos.x + size + 4, screenPos.y - size + 14), IM_COL32(150, 200, 150, 200), distStr);
+                    drawList->AddText(ImVec2(screenPos.x + size + 4, screenPos.y - size + 14), IM_COL32(255, 255, 255, 190), distStr);
                 }
             }
         }

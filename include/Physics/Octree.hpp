@@ -47,7 +47,11 @@ namespace Physics {
             int getOctant(const Vector3& nodeCenter, const Vector3& pos) const;
 
             // Recursive planet insertion function
-            void insertImpl(int nodeIdx, int bodyIdx);
+            void insertImpl(int nodeIdx, int bodyIdx, int depth = 0);
+
+            // Safety cap: co-located bodies always route to the same octant and
+            // would otherwise recurse without bound and overflow the stack.
+            static constexpr int MAX_DEPTH = 64;
 
             // Recursive accelerating calculation function
             Vector3 calculateAccelImpl(int nodeIdx, int bodyIdx, double theta, double G) const;

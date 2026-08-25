@@ -26,7 +26,11 @@ float ShadowCalculation(vec3 FragPos) {
     vec3 fragToLight = FragPos - lightPos;
     float currentDepth = length(fragToLight);
 
-    float bias = 0.15;
+    // Depth is stored/read in world units (AU). A fixed bias in AU would be far
+    // larger than a planet's visual radius, detaching shadows and hiding eclipses.
+    // Use a small distance-proportional bias instead so eclipses and ring shadows
+    // actually render while still suppressing shadow acne.
+    float bias = max(currentDepth * 0.0005, 0.0001);
     float closestDepth = texture(depthMap, fragToLight).r * far_plane;
 
     float shadow = currentDepth - bias > closestDepth ? 1.0 : 0.0;

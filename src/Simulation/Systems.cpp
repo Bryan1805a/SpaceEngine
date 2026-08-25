@@ -87,20 +87,33 @@ namespace Simulation {
 
                 // If collision
                 if (distSq < collisionDist * collisionDist) {
-                    double newMass = world.masses[i] + world.masses[j];
+                    double mI = world.masses[i];
+                    double mJ = world.masses[j];
+                    double newMass = mI + mJ;
 
                     // Apply the law of conservation of momentum
-                    world.velocities[i] = (world.velocities[i] * world.masses[i] + world.velocities[j] * world.masses[j]) / newMass;
+                    world.velocities[i] = (world.velocities[i] * mI + world.velocities[j] * mJ) / newMass;
                     world.angularVelocities[i] = world.angularVelocities[i] + world.angularVelocities[j];
 
                     // The new position is the center of the two objects
-                    world.positions[i] = (world.positions[i] * world.masses[i] + world.positions[j] * world.masses[j]) / newMass;
+                    world.positions[i] = (world.positions[i] * mI + world.positions[j] * mJ) / newMass;
+
+                    // Combine the surviving body's physical properties so future
+                    // collisions and rendering use the merged values.
+                    double rI = world.radii[i];
+                    double rJ = world.radii[j];
+                    world.radii[i] = std::cbrt(rI * rI * rI + rJ * rJ * rJ);
+                    world.albedos[i] = (world.albedos[i] * mI + world.albedos[j] * mJ) / newMass;
+                    world.greenhouses[i] = (world.greenhouses[i] * mI + world.greenhouses[j] * mJ) / newMass;
+                    world.temperatures[i] = (world.temperatures[i] * mI + world.temperatures[j] * mJ) / newMass;
+
                     world.masses[i] = newMass;
 
                     // Delete the collison planet
                     // Swap and Pop - O(1)
                     size_t lastIdx = world.masses.size() - 1;
 
+                    world.ids[j] = world.ids[lastIdx];
                     world.names[j] = world.names[lastIdx];
                     world.masses[j] = world.masses[lastIdx];
                     world.positions[j] = world.positions[lastIdx];
@@ -113,8 +126,11 @@ namespace Simulation {
                     world.greenhouses[j] = world.greenhouses[lastIdx];
                     world.temperatures[j] = world.temperatures[lastIdx];
                     world.radii[j] = world.radii[lastIdx];
+                    world.assetIndices[j] = world.assetIndices[lastIdx];
+                    world.parentIds[j] = world.parentIds[lastIdx];
 
                     // Delete last index
+                    world.ids.pop_back();
                     world.names.pop_back();
                     world.masses.pop_back();
                     world.positions.pop_back();
@@ -127,6 +143,8 @@ namespace Simulation {
                     world.greenhouses.pop_back();
                     world.temperatures.pop_back();
                     world.radii.pop_back();
+                    world.assetIndices.pop_back();
+                    world.parentIds.pop_back();
                 }
                 else {
                     ++j;

@@ -4,8 +4,8 @@ namespace Simulation {
     System::System(double gravityConstant, double timeStep)
         : gravity(gravityConstant), dt(timeStep) {}
 
-    void System::addBody(const PlanetDesc& desc) {
-        world.addBody(desc);
+    int System::addBody(const PlanetDesc& desc) {
+        return world.addBody(desc);
     }
 
     void System::removeBody(size_t index) {
